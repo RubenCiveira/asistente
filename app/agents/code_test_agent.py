@@ -2,11 +2,11 @@ from __future__ import annotations
 from app.core.base_agent import BaseAgent
 from app.core.types import Action, AgentPlan
 
-class CodeAgent(BaseAgent):
-    name = "code"
+class CodeTestAgent(BaseAgent):
+    name = "code_test"
     type = "code"
     short_description = "Codifica"
-    description = "Genera código fuente"
+    description = "Genera tests fuente"
 
     def plan(self, user_input: str, ctx: ToolContext) -> AgentPlan:
         # Aquí es donde usarías el LLM para generar el plan estructurado.

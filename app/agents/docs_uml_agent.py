@@ -2,11 +2,11 @@ from __future__ import annotations
 from app.core.base_agent import BaseAgent
 from app.core.types import Action, AgentPlan
 
-class DocsAgent(BaseAgent):
+class DocsUmlAgent(BaseAgent):
     name = "docs"
     type = "docs"
     short_description = "Genera y mejora documentación"
-    description = "Mejora README, documentación técnica, guías de uso, changelogs..."
+    description = "Genera documentación técnica uml, documentación técnica, guías de uso, changelogs..."
 
     def plan(self, user_input: str, ctx: ToolContext) -> AgentPlan:
         return AgentPlan(

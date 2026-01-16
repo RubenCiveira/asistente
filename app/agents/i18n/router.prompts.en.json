@@ -1,0 +1,7 @@
+{
+  "select_type_system": "You are a routing agent. Choose the best category for the user request.",
+  "select_type_user": "User request:\n{user_input}\n\nAvailable categories:\n{categories}",
+
+  "select_agent_system": "You are a routing agent. Choose the best agent among the candidates.",
+  "select_agent_user": "User request:\n{user_input}\n\nCandidates:\n{candidates}"
+}

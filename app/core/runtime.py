@@ -69,21 +69,22 @@ class AssistantRuntime:
         if router is None:
             raise RuntimeError("Router agent not registered")
 
-        catalog = self._build_agent_catalog()
-        intention = router.detect_intention(user_input, catalog)
-        chosen_type = router.select_type(user_input, catalog)
-        candidates = catalog.get(chosen_type) or []
+        # catalog = self._build_agent_catalog()
+        # chosen_type = router.detect_intention(user_input, catalog, ctx)
+        # chosen_type = router.select_type(user_input, catalog, ctx)
+        # candidates = catalog.get(chosen_type) or []
+        candidates = router.detect_intention(user_input, self.agents.values(), ctx)
         if not candidates:
-            chosen_type = "general"
+            # chosen_type = "general"
             candidates = catalog.get("general", [])
 
-        chosen_agent_name = router.select_agent_in_type(user_input, candidates)
+        agent = router.select_agent_in_type(user_input, candidates, ctx)
         # available_agent_names = [k for k in self.agents.keys() if k != "router"]
         # chosen_agent_name = router.select_agent(intention, self.agents)
-        agent = self.agents[chosen_agent_name]
+        # agent = self.agents[chosen_agent_name]
 
         # 2) Ejecutar agente y proponer acciones.
-        plan = agent.plan(user_input, intention)
+        plan = agent.plan(user_input, ctx)
 
 
         # 3) Revisar cada acción por los agentes.
@@ -93,7 +94,7 @@ class AssistantRuntime:
 
         reviewed_actions = []
         for action in plan.actions:
-            decision = reviewer.review(action)
+            decision = reviewer.review(action, ctx)
             if decision.approved:
                 reviewed_actions.append(action)
             elif decision.suggested_fix:
@@ -110,14 +111,14 @@ class AssistantRuntime:
             results.append(agent.execute(action, ctx))
         return results
 
-    def _build_agent_catalog(self) -> dict:
-        catalog = {}
-        for a in self.agents.values():
-            if a.name in ("router", "review"):
-                continue
-            catalog.setdefault(a.type, []).append({
-                "name": a.name,
-                "short": a.short_description,
-                "desc": a.description,
-            })
-        return catalog
+    # def _build_agent_catalog(self) -> dict:
+    #     catalog = {}
+    #     for a in self.agents.values():
+    #         if a.name in ("router", "review"):
+    #             continue
+    #         catalog.setdefault(a.type, []).append({
+    #             "name": a.name,
+    #             "short": a.short_description,
+    #             "desc": a.description,
+    #         })
+    #     return catalog

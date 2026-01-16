@@ -6,12 +6,9 @@ class GenericAgent(BaseAgent):
     name = "generic"
     type: str = "general"
     short_description: str = "Generic agent"
-    description: str = "Generic agent with no specific capabilities."
+    description: str = "Generic agent with no specific capabilities for general conversation."
 
-    def can_handle(self, intention: str) -> bool:
-        return True
-
-    def plan(self, user_input: str, intention: str):
+    def plan(self, user_input: str, ctx: ToolContext):
         actions = [
             Action(
                 tool="fs.read",
@@ -19,4 +16,4 @@ class GenericAgent(BaseAgent):
                 reason="Necesito contexto del proyecto antes de cambiar nada.",
             )
         ]
-        return AgentPlan(intention=intention, agent_name=self.name, actions=actions, notes="Draft plan")
+        return AgentPlan(agent_name=self.name, actions=actions, notes="Draft plan")

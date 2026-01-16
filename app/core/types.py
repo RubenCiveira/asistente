@@ -12,7 +12,6 @@ class Action:
 
 @dataclass
 class AgentPlan:
-    intention: str
     agent_name: str
     actions: List[Action] = field(default_factory=list)
     notes: str = ""
@@ -37,3 +36,4 @@ class ExecutionResult:
 class ToolContext:
     project_dir: str
     tracer: Tracer
+    lang: str = "en"

@@ -9,13 +9,10 @@ class ReviewAgent(BaseAgent):
     short_description = "Revisa planes"
     description = "Revisa planes"
 
-    def can_handle(self, intention: str) -> bool:
-        return intention == "review"
-
-    def plan(self, user_input: str, intention: str):
+    def plan(self, user_input: str, ctx: ToolContext):
         raise NotImplementedError("ReviewAgent no genera planes")
 
-    def review(self, action: Action) -> ReviewDecision:
+    def review(self, action: Action, ctx: ToolContext) -> ReviewDecision:
         # Reglas rápidas para ejemplo
         if action.tool == "fs.write":
             path = action.input.get("path", "")

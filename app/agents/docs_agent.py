@@ -5,7 +5,10 @@ from app.core.types import Action, AgentPlan
 
 class DocsAgent(BaseAgent):
     name = "docs"
-
+    type = "docs"
+    short_description = "Genera y mejora documentación"
+    description = "Mejora README, documentación técnica, guías de uso, changelogs..."
+    
     def can_handle(self, intention: str) -> bool:
         return intention == "docs"
 

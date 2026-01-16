@@ -5,6 +5,9 @@ from app.core.types import Action, ReviewDecision
 
 class ReviewAgent(BaseAgent):
     name = "review"
+    type = "review"
+    short_description = "Revisa planes"
+    description = "Revisa planes"
 
     def can_handle(self, intention: str) -> bool:
         return intention == "review"

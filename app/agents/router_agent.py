@@ -23,6 +23,23 @@ class RouterAgent(BaseAgent):
             return "code"
         return "general"
 
+    def select_type(self, user_input: str, available_types: dict) -> str:
+        # Inicialmente reglas rápidas, luego LLM
+        text = user_input.lower()
+        if "readme" in text or "document" in text:
+            return "docs"
+        if "docker" in text or "pipeline" in text:
+            return "ops"
+        if "csv" in text or "json" in text:
+            return "data"
+        if "test" in text or "refactor" in text or "código" in text:
+            return "code"
+        return "general"
+
+    def select_agent_in_type(self, user_input: str, candidates: list[dict]) -> str:
+        # De momento: el primero. Luego LLM con descripciones completas
+        return candidates[0]["name"]
+
     def select_agent(self, intention: str, agents: Dict[str, BaseAgent]) -> str:
         # Si existe uno que can_handle, úsalo.
         for name, agent in agents.items():

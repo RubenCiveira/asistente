@@ -69,9 +69,17 @@ class AssistantRuntime:
         if router is None:
             raise RuntimeError("Router agent not registered")
 
-        available_agent_names = [k for k in self.agents.keys() if k != "router"]
-        intention = router.detect_intention(user_input, available_agent_names)
-        chosen_agent_name = router.select_agent(intention, self.agents)
+        catalog = self._build_agent_catalog()
+        intention = router.detect_intention(user_input, catalog)
+        chosen_type = router.select_type(user_input, catalog)
+        candidates = catalog.get(chosen_type) or []
+        if not candidates:
+            chosen_type = "general"
+            candidates = catalog.get("general", [])
+
+        chosen_agent_name = router.select_agent_in_type(user_input, candidates)
+        # available_agent_names = [k for k in self.agents.keys() if k != "router"]
+        # chosen_agent_name = router.select_agent(intention, self.agents)
         agent = self.agents[chosen_agent_name]
 
         # 2) Ejecutar agente y proponer acciones.
@@ -101,3 +109,15 @@ class AssistantRuntime:
             # Por simplicidad: ejecuta el agente elegido.
             results.append(agent.execute(action, ctx))
         return results
+
+    def _build_agent_catalog(self) -> dict:
+        catalog = {}
+        for a in self.agents.values():
+            if a.name in ("router", "review"):
+                continue
+            catalog.setdefault(a.type, []).append({
+                "name": a.name,
+                "short": a.short_description,
+                "desc": a.description,
+            })
+        return catalog

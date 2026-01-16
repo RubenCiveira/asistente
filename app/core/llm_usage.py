@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from typing import Optional
+
 
 @contextmanager
 def openai_usage_callback():
-    # Preferido (docs actuales)
+    """
+    Devuelve un callback (cb) con:
+      - cb.prompt_tokens
+      - cb.completion_tokens
+      - cb.total_tokens
+      - cb.total_cost
+
+    Si no está disponible (p.ej. falta langchain-community), yield None.
+    """
     try:
         from langchain_community.callbacks.manager import get_openai_callback  # type: ignore
-        with get_openai_callback() as cb:
-            yield cb
-        return
     except Exception:
-        pass
+        yield None
+        return
 
-    # Fallback (algunas versiones)
-    from langchain.callbacks import get_openai_callback  # type: ignore
     with get_openai_callback() as cb:
         yield cb

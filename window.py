@@ -145,7 +145,11 @@ class MainApp(App):
             ],
         }
         result = await self.push_screen(FormDialog(schema))
-        print(result)
+        chat = self.query_one("#chat", Static)
+        if result is None:
+            chat.update("Formulario cancelado.")
+        else:
+            chat.update(str(result))
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -154,15 +158,15 @@ class MainApp(App):
             yield Input(placeholder="Escribe aquí… (Enter para enviar)", id="prompt")
         yield Footer()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        chat = self.query_one("#chat", Static)
-        text = event.value.strip()
-        if not text:
-            return
+    # def on_input_submitted(self, event: Input.Submitted) -> None:
+    #     chat = self.query_one("#chat", Static)
+    #     text = event.value.strip()
+    #     if not text:
+    #         return
 
-        # “log” simple: añadimos líneas (luego lo haremos bonito)
-        chat.update(chat.renderable + f"\n\n[b]user>[/b] {text}")
-        event.input.value = ""
+    #     # “log” simple: añadimos líneas (luego lo haremos bonito)
+    #     chat.update(chat.renderable + f"\n\n[b]user>[/b] {text}")
+    #     event.input.value = ""
 
 
 if __name__ == "__main__":

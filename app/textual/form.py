@@ -93,8 +93,7 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
             yield Static("", id="field")
             yield Static("", id="errors")
             with Horizontal():
-                yield Button("← Back", id="back")
-                yield Button("Cancel", id="cancel", variant="error")
+                yield Button("Cancel", id="back", variant="error")
                 yield Button("Next →", id="next", variant="primary")
 
     def on_mount(self) -> None:
@@ -106,10 +105,8 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
-            case "cancel":
-                self.dismiss(None)
             case "back":
-                self._go_back()
+                self.action_back_or_cancel()
             case "next":
                 self._submit_current()
             case "array-add":
@@ -123,7 +120,10 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "array-input":
-            self._add_array_item()
+            if event.input.value.strip():
+                self._add_array_item()
+            else:
+                self._submit_current()
         else:
             self._submit_current()
 
@@ -249,6 +249,14 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
             inp = Input(placeholder=label)
             self.current_widget = inp
             container.mount(inp)
+
+        back_btn = self.query_one("#back", Button)
+        if self.index == 0:
+            back_btn.label = "Cancel"
+            back_btn.variant = "error"
+        else:
+            back_btn.label = "← Back"
+            back_btn.variant = "error"
 
         next_btn = self.query_one("#next", Button)
         if self.index >= len(self.field_order) - 1:

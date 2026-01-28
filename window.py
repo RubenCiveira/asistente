@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Static
-from textual.containers import Vertical
+from textual.widgets import Header, Footer, Input, Static, Button
+from textual.containers import Vertical, Horizontal
 from app.textual.form import FormDialog
+
+from textual import work
 
 class MainApp(App):
     CSS = """
@@ -19,8 +21,8 @@ class MainApp(App):
     }
     """
 
-
-    async def on_mount(self):
+    @work
+    async def open_form_worker(self):
         schema = {
             "type": "object",
             "properties": {
@@ -144,7 +146,10 @@ class MainApp(App):
                 },
             ],
         }
-        result = await self.push_screen(FormDialog(schema))
+        result = await self.push_screen_wait(FormDialog(schema))
+        self._handle_form_result(result)
+
+    def _handle_form_result(self, result):
         chat = self.query_one("#chat", Static)
         if result is None:
             chat.update("Formulario cancelado.")
@@ -155,8 +160,20 @@ class MainApp(App):
         yield Header()
         with Vertical():
             yield Static("Listo. Aquí irá el chat/log.", id="chat")
+            with Horizontal():
+                yield Button("Open Form", id="open_form", variant="primary")
+                yield Button("Clear", id="clear_chat")
             yield Input(placeholder="Escribe aquí… (Enter para enviar)", id="prompt")
         yield Footer()
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        chat = self.query_one("#chat", Static)
+
+        if event.button.id == "clear_chat":
+            chat.update("")
+
+        if event.button.id == "open_form":
+            self.open_form_worker()
 
     # def on_input_submitted(self, event: Input.Submitted) -> None:
     #     chat = self.query_one("#chat", Static)

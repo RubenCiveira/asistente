@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 from prompt_toolkit import prompt
+from prompt_toolkit.key_binding import KeyBindings
 from jsonschema import (
     validate,
     Draft202012Validator,
@@ -7,10 +8,22 @@ from jsonschema import (
 )
 
 
+class _EscapePressed(Exception):
+    pass
+
+
 class ConsoleFormRenderer:
     def __init__(self):
         self.schema: Dict[str, Any] | None = None
         self.field_order: List[str] = []
+        self._kb = KeyBindings()
+
+        @self._kb.add("escape")
+        def _(event):
+            event.app.exit(exception=_EscapePressed())
+
+    def _prompt(self, message: str) -> str:
+        return prompt(message, key_bindings=self._kb)
 
     # ============================================================
     # PUBLIC API
@@ -30,35 +43,47 @@ class ConsoleFormRenderer:
         print("\n=== FORM INPUT ===")
 
         try:
-            for field in self.field_order:
+            i = 0
+            while i < len(self.field_order):
+                field = self.field_order[i]
                 spec = properties[field]
 
-                while True:
-                    value = self._ask_field(
-                        name=field,
-                        spec=spec,
-                        required=field in required,
-                        partial_data=data,
-                    )
+                try:
+                    while True:
+                        value = self._ask_field(
+                            name=field,
+                            spec=spec,
+                            required=field in required,
+                            partial_data=data,
+                        )
 
-                    # Campo opcional sin valor
-                    if value is None and field not in required:
+                        # Campo opcional sin valor
+                        if value is None and field not in required:
+                            break
+
+                        errors = self._validate_field_incremental(
+                            field_name=field,
+                            candidate_value=value,
+                            partial_data=data,
+                        )
+
+                        if errors:
+                            for e in errors:
+                                print(f"❌ {e}")
+                            print("Please try again.\n")
+                            continue
+
+                        data[field] = value
                         break
+                except _EscapePressed:
+                    if i == 0:
+                        print("\n⚠ Form cancelled.")
+                        return None
+                    i -= 1
+                    data.pop(self.field_order[i], None)
+                    continue
 
-                    errors = self._validate_field_incremental(
-                        field_name=field,
-                        candidate_value=value,
-                        partial_data=data,
-                    )
-
-                    if errors:
-                        for e in errors:
-                            print(f"❌ {e}")
-                        print("Please try again.\n")
-                        continue
-
-                    data[field] = value
-                    break
+                i += 1
         except (KeyboardInterrupt, EOFError):
             print("\n⚠ Form cancelled.")
             return None
@@ -163,7 +188,7 @@ class ConsoleFormRenderer:
         label += ": "
 
         while True:
-            text = prompt(label).strip()
+            text = self._prompt(label).strip()
 
             if not text:
                 if default is not None:
@@ -189,7 +214,7 @@ class ConsoleFormRenderer:
         hint += ": "
 
         while True:
-            text = prompt(hint).strip()
+            text = self._prompt(hint).strip()
 
             if not text:
                 if default is not None:
@@ -233,7 +258,7 @@ class ConsoleFormRenderer:
         hint += ": "
 
         while True:
-            text = prompt(hint).strip()
+            text = self._prompt(hint).strip()
 
             if not text:
                 if default is not None:
@@ -286,7 +311,7 @@ class ConsoleFormRenderer:
             hint += "): "
 
             while True:
-                text = prompt(hint).strip()
+                text = self._prompt(hint).strip()
 
                 if not text:
                     if default:
@@ -331,7 +356,7 @@ class ConsoleFormRenderer:
         print("Add items one by one (Enter to finish):")
 
         while True:
-            text = prompt("> ").strip()
+            text = self._prompt("> ").strip()
             if not text:
                 break
 

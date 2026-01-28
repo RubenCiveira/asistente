@@ -69,9 +69,13 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
     #array-input-row Button {
         width: auto;
     }
+
+    #array-items > ListItem.--highlight {
+        background: $accent 50%;
+    }
     """
 
-    def __init__(self, schema: Dict[str, Any]):
+    def __init__(self, schema: Dict[str, Any], initial_values: Optional[Dict[str, Any]] = None):
         super().__init__()
         self.schema = schema
         self.properties = schema.get("properties", {})
@@ -79,7 +83,8 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
         self.field_order = list(self.properties.keys())
 
         self.index = 0
-        self.data: Dict[str, Any] = {}
+        self._initial_values: Dict[str, Any] = dict(initial_values or {})
+        self.data: Dict[str, Any] = dict(self._initial_values)
         self.current_widget = None
         self._array_values: List[Any] = []
 
@@ -112,7 +117,44 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
             case "array-add":
                 self._add_array_item()
 
+    def _is_free_text_array(self) -> bool:
+        field = self.field_order[self.index]
+        spec = self.properties[field]
+        if spec.get("type") != "array":
+            return False
+        items_spec = spec.get("items", {})
+        return "oneOf" not in items_spec and "enum" not in items_spec
+
     def on_key(self, event) -> None:
+        if self._is_free_text_array():
+            try:
+                lv = self.query_one("#array-items", ListView)
+                inp = self.query_one("#array-input", Input)
+            except Exception:
+                pass
+            else:
+                if event.key == "up" and self._array_values:
+                    if lv.index is None:
+                        lv.index = len(self._array_values) - 1
+                    elif lv.index > 0:
+                        lv.index -= 1
+                    event.prevent_default()
+                    event.stop()
+                    return
+                elif event.key == "down" and lv.index is not None:
+                    if lv.index < len(self._array_values) - 1:
+                        lv.index += 1
+                    else:
+                        lv.index = None
+                    event.prevent_default()
+                    event.stop()
+                    return
+                elif event.key == "backspace" and not inp.value and lv.index is not None:
+                    self._remove_array_item(lv, lv.index)
+                    event.prevent_default()
+                    event.stop()
+                    return
+
         if event.key == "enter":
             focused = self.focused
             if not isinstance(focused, (Button, Input)):
@@ -126,6 +168,13 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
                 self._submit_current()
         else:
             self._submit_current()
+
+    def _get_initial_value(self, field: str):
+        if field in self.data:
+            return self.data[field]
+        if field in self._initial_values:
+            return self._initial_values[field]
+        return self.properties[field].get("default")
 
     def _add_array_item(self):
         try:
@@ -168,6 +217,16 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
 
         inp.focus()
 
+    def _remove_array_item(self, lv: ListView, idx: int) -> None:
+        if idx < 0 or idx >= len(self._array_values):
+            return
+        self._array_values.pop(idx)
+        lv.children[idx].remove()
+        if not self._array_values:
+            lv.index = None
+        elif idx >= len(self._array_values):
+            lv.index = len(self._array_values) - 1
+
     def _go_back(self):
         if self.index == 0:
             return
@@ -206,18 +265,33 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
         if "oneOf" in spec:
             buttons = [RadioButton(opt.get("title", opt["const"]), id=str(opt["const"])) for opt in spec["oneOf"]]
             rs = RadioSet(*buttons)
+            value = self._get_initial_value(field)
+            if value is not None:
+                for rb in rs.query(RadioButton):
+                    if rb.id == str(value):
+                        rb.value = True
+                        break
             self.current_widget = rs
             container.mount(Static(label), rs)
 
         elif "enum" in spec:
             buttons = [RadioButton(str(opt), id=str(opt)) for opt in spec["enum"]]
             rs = RadioSet(*buttons)
+            value = self._get_initial_value(field)
+            if value is not None:
+                for rb in rs.query(RadioButton):
+                    if rb.id == str(value):
+                        rb.value = True
+                        break
             self.current_widget = rs
             container.mount(Static(label), rs)
 
         elif spec.get("type") == "boolean":
             cb = Checkbox(label)
             self.current_widget = cb
+            value = self._get_initial_value(field)
+            if value is not None:
+                cb.value = bool(value)
             container.mount(cb)
 
         elif spec.get("type") == "array":
@@ -235,18 +309,27 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
                         options.append((str(opt), str(opt)))
 
                 sl = SelectionList[str](*options, id="array-selection")
+                initial = self._get_initial_value(field) or []
+                for v in initial:
+                    sl.select(str(v))
                 self.current_widget = sl
                 container.mount(Static(label), sl)
             else:
                 # Free-text array
-                self._array_values = []
-                lv = ListView(id="array-items")
+                self._array_values = list(self._get_initial_value(field) or [])
+                lv = ListView(
+                    *[ListItem(Label(str(v))) for v in self._array_values],
+                    id="array-items",
+                )
                 inp = Input(placeholder="Add item and press Enter", id="array-input")
                 self.current_widget = inp
                 container.mount(Static(label), lv, Horizontal(inp, Button("Add", id="array-add"), id="array-input-row"))
 
         else:
             inp = Input(placeholder=label)
+            value = self._get_initial_value(field)
+            if value is not None:
+                inp.value = str(value)
             self.current_widget = inp
             container.mount(inp)
 

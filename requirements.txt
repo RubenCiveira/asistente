@@ -6,3 +6,4 @@ rich==14.2.0
 langchain-ollama==1.0.1
 jsonschema==4.26.0
 prompt_toolkit==3.0.52
+textual==7.4.0

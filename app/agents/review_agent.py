@@ -2,7 +2,6 @@ from __future__ import annotations
 from app.core.base_agent import BaseAgent
 from app.core.types import Action, ReviewDecision
 
-
 class ReviewAgent(BaseAgent):
     name = "review"
     type = "review"

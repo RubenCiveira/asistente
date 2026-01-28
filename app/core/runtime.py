@@ -69,19 +69,12 @@ class AssistantRuntime:
         if router is None:
             raise RuntimeError("Router agent not registered")
 
-        # catalog = self._build_agent_catalog()
-        # chosen_type = router.detect_intention(user_input, catalog, ctx)
-        # chosen_type = router.select_type(user_input, catalog, ctx)
-        # candidates = catalog.get(chosen_type) or []
         candidates = router.detect_intention(user_input, self.agents.values(), ctx)
         if not candidates:
             # chosen_type = "general"
             candidates = catalog.get("general", [])
 
         agent = router.select_agent_in_type(user_input, candidates, ctx)
-        # available_agent_names = [k for k in self.agents.keys() if k != "router"]
-        # chosen_agent_name = router.select_agent(intention, self.agents)
-        # agent = self.agents[chosen_agent_name]
 
         # 2) Ejecutar agente y proponer acciones.
         plan = agent.plan(user_input, ctx)

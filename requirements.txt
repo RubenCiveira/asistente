@@ -3,3 +3,4 @@ langchain-openai==1.1.7
 langchain-community==0.4.1
 python-dotenv==1.2.1
 rich==14.2.0
+langchain-ollama==1.0.1

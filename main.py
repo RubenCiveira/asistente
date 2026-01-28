@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from langchain_openai import ChatOpenAI
+from langchain_ollama import OllamaLLM, OllamaEmbeddings
 
 from app.core.runtime import AssistantRuntime
 from app.core.base_agent import BaseAgent
@@ -53,12 +54,24 @@ def main():
     if not os.path.isdir(project_dir):
         raise SystemExit(f"Project dir no existe o no es directorio: {project_dir}")
 
+    llm = OllamaLLM(
+        model="llama3.2:3b",
+        base_url="http://localhost:11434",
+        temperature=0.2
+    )
+
+    print(llm.invoke("Resume DDD en 3 puntos"))
+
+
+def oldmain(): 
     # LLM
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         api_key=os.getenv("OPENAI_API_KEY"),
         temperature=0.2,
     )
+
+    llm 
 
     runtime = AssistantRuntime(
         llm=llm,

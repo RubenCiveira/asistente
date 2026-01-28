@@ -1,0 +1,427 @@
+from typing import Any, Dict, List
+from prompt_toolkit import prompt
+from jsonschema import (
+    validate,
+    Draft202012Validator,
+    ValidationError as JsonSchemaError,
+)
+
+
+class ConsoleFormRenderer:
+    def __init__(self):
+        self.schema: Dict[str, Any] | None = None
+        self.field_order: List[str] = []
+
+    # ============================================================
+    # PUBLIC API
+    # ============================================================
+
+    def ask_form(self, json_schema: Dict[str, Any]) -> Dict[str, Any] | None:
+        if json_schema.get("type") != "object":
+            raise ValueError("Only JSON Schema with type=object is supported")
+
+        self.schema = json_schema
+        properties = json_schema.get("properties", {})
+        required = set(json_schema.get("required", []))
+        self.field_order = list(properties.keys())
+
+        data: Dict[str, Any] = {}
+
+        print("\n=== FORM INPUT ===")
+
+        try:
+            for field in self.field_order:
+                spec = properties[field]
+
+                while True:
+                    value = self._ask_field(
+                        name=field,
+                        spec=spec,
+                        required=field in required,
+                        partial_data=data,
+                    )
+
+                    # Campo opcional sin valor
+                    if value is None and field not in required:
+                        break
+
+                    errors = self._validate_field_incremental(
+                        field_name=field,
+                        candidate_value=value,
+                        partial_data=data,
+                    )
+
+                    if errors:
+                        for e in errors:
+                            print(f"❌ {e}")
+                        print("Please try again.\n")
+                        continue
+
+                    data[field] = value
+                    break
+        except (KeyboardInterrupt, EOFError):
+            print("\n⚠ Form cancelled.")
+            return None
+
+        # Validación final completa
+        try:
+            validate(instance=data, schema=json_schema)
+        except JsonSchemaError as e:
+            print("\n❌ Final validation error:", e.message)
+            raise
+
+        return data
+
+    # ============================================================
+    # INCREMENTAL VALIDATION
+    # ============================================================
+
+    def _validate_field_incremental(
+        self,
+        *,
+        field_name: str,
+        candidate_value: Any,
+        partial_data: Dict[str, Any],
+    ) -> List[str]:
+        """
+        Valida un campo considerando solo los campos
+        definidos hasta ese punto del formulario.
+        """
+
+        assert self.schema is not None
+
+        properties = self.schema.get("properties", {})
+        required = set(self.schema.get("required", []))
+
+        idx = self.field_order.index(field_name)
+        visible_fields = set(self.field_order[: idx + 1])
+
+        subschema: Dict[str, Any] = {
+            "type": "object",
+            "properties": {
+                k: v for k, v in properties.items() if k in visible_fields
+            },
+            "required": [k for k in required if k in visible_fields],
+        }
+
+        # Copiamos keywords de validación cruzada
+        for keyword in ("allOf", "anyOf", "oneOf", "if", "then", "else"):
+            if keyword in self.schema:
+                subschema[keyword] = self.schema[keyword]
+
+        instance = dict(partial_data)
+        instance[field_name] = candidate_value
+
+        validator = Draft202012Validator(subschema)
+        errors = list(validator.iter_errors(instance))
+
+        return [e.message for e in errors]
+
+    # ============================================================
+    # INPUT HANDLING
+    # ============================================================
+
+    def _ask_field(self, name: str, spec: Dict[str, Any], required: bool, partial_data: Dict[str, Any] | None = None):
+        description = spec.get("description", "")
+        default = spec.get("default")
+
+        label = name
+        if description:
+            label += f" — {description}"
+        if default is not None:
+            label += f" [default: {default}]"
+        if required:
+            label += " *"
+
+        if spec.get("type") == "array":
+            return self._ask_array(label, spec, required, field_name=name, partial_data=partial_data or {})
+
+        if "oneOf" in spec:
+            return self._ask_one_of(label, spec["oneOf"], default, required)
+
+        if "enum" in spec:
+            return self._ask_enum(
+                label,
+                enum=spec["enum"],
+                default=default,
+                required=required,
+                field_type=spec.get("type", "string"),
+            )
+
+        return self._ask_scalar(
+            label,
+            field_type=spec.get("type", "string"),
+            default=default,
+            required=required,
+        )
+
+    # ============================================================
+    # FIELD TYPES
+    # ============================================================
+
+    def _ask_scalar(self, label, field_type, default, required):
+        label += ": "
+
+        while True:
+            text = prompt(label).strip()
+
+            if not text:
+                if default is not None:
+                    return default
+                if required:
+                    print("❌ This field is required")
+                    continue
+                return None
+
+            try:
+                return self._cast_value(text, field_type)
+            except ValueError as e:
+                print(f"❌ {e}")
+
+    def _ask_enum(self, label, enum, default, required, field_type):
+        print(f"\n{label}:")
+        for i, opt in enumerate(enum, start=1):
+            print(f"  {i}) {opt}")
+
+        hint = "Choose an option"
+        if default is not None:
+            hint += f" (Enter for default={default})"
+        hint += ": "
+
+        while True:
+            text = prompt(hint).strip()
+
+            if not text:
+                if default is not None:
+                    return default
+                if required:
+                    print("❌ This field is required")
+                    continue
+                return None
+
+            if text.isdigit():
+                idx = int(text)
+                if 1 <= idx <= len(enum):
+                    return enum[idx - 1]
+                print("❌ Invalid selection")
+                continue
+
+            try:
+                value = self._cast_value(text, field_type)
+            except ValueError as e:
+                print(f"❌ {e}")
+                continue
+
+            if value in enum:
+                return value
+
+            print("❌ Invalid option")
+
+    def _ask_one_of(self, label, options, default, required):
+        print(f"\n{label}:")
+        values = []
+
+        for i, opt in enumerate(options, start=1):
+            value = opt.get("const")
+            title = opt.get("title", str(value))
+            values.append(value)
+            print(f"  {i}) {title}")
+
+        hint = "Choose an option"
+        if default is not None:
+            hint += f" (Enter for default={default})"
+        hint += ": "
+
+        while True:
+            text = prompt(hint).strip()
+
+            if not text:
+                if default is not None:
+                    return default
+                if required:
+                    print("❌ This field is required")
+                    continue
+                return None
+
+            if text.isdigit():
+                idx = int(text)
+                if 1 <= idx <= len(values):
+                    return values[idx - 1]
+                print("❌ Invalid selection")
+                continue
+
+            if text in values:
+                return text
+
+            print("❌ Invalid option")
+
+    def _ask_array(self, label, spec, required, field_name, partial_data):
+        items = spec.get("items", {})
+        default = spec.get("default", [])
+        min_items = spec.get("minItems", 0)
+        max_items = spec.get("maxItems")
+        unique = spec.get("uniqueItems", False)
+
+        print(f"\n{label}:")
+
+        # Multi-select
+        if "oneOf" in items or "enum" in items:
+            options = []
+            titles = []
+
+            if "oneOf" in items:
+                for opt in items["oneOf"]:
+                    options.append(opt.get("const"))
+                    titles.append(opt.get("title", str(opt.get("const"))))
+            else:
+                options = items["enum"]
+                titles = [str(o) for o in options]
+
+            for i, title in enumerate(titles, start=1):
+                print(f"  {i}) {title}")
+
+            hint = "Select options (comma separated"
+            if default:
+                hint += f", Enter for default={default}"
+            hint += "): "
+
+            while True:
+                text = prompt(hint).strip()
+
+                if not text:
+                    if default:
+                        return default
+                    if required or min_items > 0:
+                        print("❌ At least one value is required")
+                        continue
+                    return []
+
+                try:
+                    idxs = [int(x.strip()) for x in text.split(",")]
+                    values = [options[i - 1] for i in idxs if 1 <= i <= len(options)]
+                except Exception:
+                    print("❌ Invalid selection")
+                    continue
+
+                if unique:
+                    values = list(dict.fromkeys(values))
+
+                if min_items and len(values) < min_items:
+                    print(f"❌ Minimum {min_items} items required")
+                    continue
+
+                if max_items and len(values) > max_items:
+                    print(f"❌ Maximum {max_items} items allowed")
+                    continue
+
+                array_errors = self._validate_array_partial(
+                    field_name=field_name,
+                    values=values,
+                    partial_data=partial_data,
+                )
+                if array_errors:
+                    for e in array_errors:
+                        print(f"❌ {e}")
+                    continue
+
+                return values
+
+        # Free array
+        values = []
+        print("Add items one by one (Enter to finish):")
+
+        while True:
+            text = prompt("> ").strip()
+            if not text:
+                break
+
+            try:
+                value = self._cast_value(text, items.get("type", "string"))
+            except ValueError as e:
+                print(f"❌ {e}")
+                continue
+
+            # Validate item against items schema
+            item_errors = self._validate_array_item(value, items)
+            if item_errors:
+                for e in item_errors:
+                    print(f"❌ {e}")
+                continue
+
+            # Unique check
+            if unique and value in values:
+                print("❌ Duplicate value not allowed")
+                continue
+
+            # Validate array partially in incremental context
+            candidate = values + [value]
+            array_errors = self._validate_array_partial(
+                field_name=field_name,
+                values=candidate,
+                partial_data=partial_data,
+            )
+            if array_errors:
+                for e in array_errors:
+                    print(f"❌ {e}")
+                continue
+
+            values.append(value)
+
+            if max_items and len(values) >= max_items:
+                print(f"ℹ Reached maxItems={max_items}")
+                break
+
+        if (required or min_items > 0) and len(values) == 0:
+            print("❌ At least one value is required")
+            return self._ask_array(label, spec, required, field_name, partial_data)
+
+        if min_items and len(values) < min_items:
+            print(f"❌ Minimum {min_items} items required")
+            return self._ask_array(label, spec, required, field_name, partial_data)
+
+        if max_items and len(values) > max_items:
+            print(f"❌ Maximum {max_items} items allowed")
+            return self._ask_array(label, spec, required, field_name, partial_data)
+
+        return values
+
+    # ============================================================
+
+    def _cast_value(self, raw: str, field_type: str):
+        if field_type == "string":
+            return raw
+        if field_type == "integer":
+            return int(raw)
+        if field_type == "number":
+            return float(raw)
+        if field_type == "boolean":
+            if raw.lower() in ("true", "yes", "y", "1"):
+                return True
+            if raw.lower() in ("false", "no", "n", "0"):
+                return False
+            raise ValueError("Expected boolean (yes/no, true/false)")
+        raise ValueError(f"Unsupported field type: {field_type}")
+
+    def _validate_array_item(self, item_value, item_schema) -> list[str]:
+        """
+        Valida un único elemento del array contra el schema 'items'
+        """
+        validator = Draft202012Validator(item_schema)
+        errors = list(validator.iter_errors(item_value))
+        return [e.message for e in errors]
+
+    def _validate_array_partial(
+        self,
+        field_name: str,
+        values: list,
+        partial_data: dict,
+    ) -> list[str]:
+        """
+        Valida el array completo (minItems, uniqueItems, contains, etc.)
+        dentro del contexto incremental.
+        """
+        return self._validate_field_incremental(
+            field_name=field_name,
+            candidate_value=values,
+            partial_data=partial_data,
+        )

@@ -179,8 +179,6 @@ class PathDialog(ModalScreen[Optional[Path]]):
                 if prefix and not p.name.startswith(prefix):
                     continue
 
-                # if self.select == "file" and p.is_dir():
-                #     continue
                 if self.select == "dir" and p.is_file():
                     continue
 

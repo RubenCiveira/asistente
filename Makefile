@@ -16,7 +16,7 @@ $(VENV)/bin/activate: requirements.txt
 
 ## test: run the full test suite
 test: build
-	$(VENV)/bin/pytest tests/ -v
+	PYTHONPATH=src $(VENV)/bin/pytest test/ -v
 
 ## lint: static analysis with ruff
 lint: build

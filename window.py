@@ -3,8 +3,7 @@ from __future__ import annotations
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, Static, Button, Markdown, Label
 from textual.containers import Vertical, Horizontal, VerticalScroll
-from app.ui.textual.action.test.test_path import TestPath
-from app.ui.textual.action.test.test_form import TestForm
+from app.ui.textual.action.select_project import SelectProject
 from app.ui.textual.action.select_workspace import SelectWorkspace
 from app.config import AppConfig, default_workspaces_dir
 
@@ -29,7 +28,7 @@ class MainApp(App):
 
     BINDINGS = [
         ("ctrl+w", "select_workspace", "Workspace"),
-        ("ctrl+p", "select_project", "Project"),
+        ("ctrl+y", "select_project", "Project"),
         ("ctrl+q", "quit", "Quit"),
     ]
 
@@ -38,8 +37,7 @@ class MainApp(App):
         self.config = AppConfig.load()
         self.current_workspace = None
         self.current_project = None
-        self.test_path = TestPath(self)
-        self.test_form = TestForm(self)
+        self._select_project_action = SelectProject(self)
         self._select_workspace_action = SelectWorkspace(self)
 
     def echo(self, result: Markdown | None):
@@ -85,6 +83,13 @@ class MainApp(App):
         self.config.save()
         self.echo(Markdown(f"Workspace activo: **{ws.name}**"))
         self._refresh_header()
+
+    def select_project(self, prj):
+        self.current_project = prj
+        self._refresh_header()
+
+    def action_select_project(self):
+        self.run_worker( self._select_project_action.run() )
 
     def action_select_workspace(self):
         self.run_worker( self._select_workspace_action.run() )

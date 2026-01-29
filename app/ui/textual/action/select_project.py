@@ -7,33 +7,29 @@ from pathlib import Path
 
 from app.ui.textual.path_dialog import PathDialog
 from app.config import AppConfig, default_workspaces_dir
-from app.context.workspace import Workspace
+from app.context.project import Project
 
-
-class SelectWorkspace:
+class SelectProject:
     def __init__(self, window):
         self.window = window
 
     async def run(self):
-        initial_dir = default_workspaces_dir()
-        initial_dir.mkdir(parents=True, exist_ok=True)
-
         result = await self.window.push_screen_wait(
             PathDialog(
                 root_dir=Path.home(),
                 must_exist=False,
                 select="dir",
-                initial_path=initial_dir,
-                title="Select workspace directory",
+                title="Select project directory",
             )
         )
 
         if result is None:
             self.window.echo(Markdown("No workspace selected."))
             return
-
+    
         try:
-            ws = Workspace.load_or_create(result)
-            self.window.select_workspace(ws)
+            prj = Project.load_from_dir(result)
+            self.window.select_project(prj)
         except Exception as e:
             self.window.echo(Markdown(f"Cannot create workspace: {e}"))
+            return

@@ -6,6 +6,7 @@ from textual.containers import Vertical, Horizontal, VerticalScroll
 from app.ui.textual.action.test.test_path import TestPath
 from app.ui.textual.action.test.test_form import TestForm
 from app.ui.textual.action.select_workspace import SelectWorkspace
+from app.config import AppConfig, default_workspaces_dir
 
 class MainApp(App):
     CSS = """
@@ -22,10 +23,11 @@ class MainApp(App):
     """
     def __init__(self):
         super().__init__()
+        self.config = AppConfig.load()
         self.current_workspace = None
         self.test_path = TestPath(self)
         self.test_form = TestForm(self)
-        self.select_workspace = SelectWorkspace(self)
+        self._select_workspace_action = SelectWorkspace(self)
 
     def echo(self, result: Markdown | None):
         if result is not None:
@@ -65,7 +67,14 @@ class MainApp(App):
             yield Input(placeholder="Escribe aquí… (Enter para enviar)", id="prompt")
         yield Footer()
 
-    async def on_button_pressed(self, evesolont: Button.Pressed) -> None:
+    def select_workspace(self, ws):
+        self.current_workspace = ws
+        self.sub_title = ws.name
+        self.config.set_active_workspace(ws.root_dir)
+        self.config.save()
+        self.echo(Markdown(f"Workspace activo: **{ws.name}**"))
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "clear_chat":
             chat = self.query_one("#chat", VerticalScroll)
             chat.remove_children()
@@ -75,7 +84,7 @@ class MainApp(App):
         if event.button.id == "select_file":
             self.run_worker( self.test_path.run() )
         if event.button.id == "select_workspace":
-            self.run_worker( self.select_workspace.run() )
+            self.run_worker( self._select_workspace_action.run() )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id != "prompt":

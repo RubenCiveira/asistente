@@ -11,12 +11,10 @@ from app.context.workspace import Workspace
 
 
 class SelectWorkspace:
-    def __init__(self, window: App):
+    def __init__(self, window):
         self.window = window
 
     async def run(self):
-        app_config = AppConfig.load()
-
         initial_dir = default_workspaces_dir()
         initial_dir.mkdir(parents=True, exist_ok=True)
 
@@ -39,9 +37,4 @@ class SelectWorkspace:
         except Exception as e:
             self.window.echo(Markdown(f"Cannot create workspace: {e}"))
             return
-
-        self.window.current_workspace = ws
-        app_config.set_active_workspace(result)
-        app_config.save()
-
-        self.window.echo(Markdown(f"Workspace activo: **{ws.name}**"))
+        self.window.select_workspace(ws)

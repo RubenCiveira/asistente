@@ -22,10 +22,7 @@ class Project:
     @classmethod
     def load_or_create(cls, project_dir: Path) -> "Project":
         project_dir = project_dir.expanduser().resolve()
-        if not project_dir.is_dir():
-            raise NotADirectoryError(
-                f"Project directory does not exist: {project_dir}"
-            )
+        project_dir.mkdir(parents=True, exist_ok=True)
 
         config_path = project_dir / cls.CONFIG_RELATIVE_PATH
 

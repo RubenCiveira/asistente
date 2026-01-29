@@ -65,7 +65,7 @@ class SelectProject:
         result = await self.window.push_screen_wait(
             PathDialog(
                 root_dir=Path.home(),
-                must_exist=True,
+                must_exist=False,
                 select="dir",
                 title="Select project directory",
             )

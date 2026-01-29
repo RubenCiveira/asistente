@@ -109,7 +109,7 @@ class MainApp(App):
         pr = self.current_project.name if self.current_project else "Sin projecto"
 
         self.title = f"Asistente  ·  {ws} / {pr}"
-        self.sub_title = "Sin projecto"
+        self.sub_title = ""
         # header.sub_title = str(self.workspace.root_dir) if self.workspace else ""
 
 if __name__ == "__main__":

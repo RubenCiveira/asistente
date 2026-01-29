@@ -13,7 +13,7 @@ from app.core.base_agent import BaseAgent
 
 from app.tools import fs_read_tool, fs_write_tool
 
-from app.console.form import ConsoleFormRenderer
+from app.ui.console.form import ConsoleFormRenderer
 
 console = Console()
 

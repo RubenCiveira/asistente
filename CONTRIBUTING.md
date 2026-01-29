@@ -19,7 +19,7 @@ make test           # pytest with verbose output
 ```
 
 All new code should include tests. Place them under `tests/` and mirror the
-source layout (e.g. tests for `app/textual/form.py` go in
+source layout (e.g. tests for `app/ui/textual/form.py` go in
 `tests/test_textual_form.py`).
 
 ## Code style

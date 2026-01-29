@@ -83,10 +83,11 @@ asistente/
 │   ├── tools/
 │   │   ├── fs_read.py        # Sandboxed file read
 │   │   └── fs_write.py       # Sandboxed file write
-│   ├── console/
-│   │   └── form.py           # Console JSON-Schema form
-│   └── textual/
-│       └── form.py           # Textual TUI JSON-Schema form dialog
+│   ├── ui/
+│   │   ├── console/
+│   │   │   └── form.py       # Console JSON-Schema form
+│   │   └── textual/
+│   │       └── form.py       # Textual TUI JSON-Schema form dialog
 ├── tests/                    # Test suite
 ├── requirements.txt
 ├── requirements.lock.txt

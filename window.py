@@ -5,7 +5,7 @@ from textual.widgets import Header, Footer, Input, Static, Button, Markdown
 from textual.containers import Vertical, Horizontal, VerticalScroll
 from textual import work
 
-from app.textual.form import FormDialog
+from app.ui.textual.form import FormDialog
 
 class MainApp(App):
     CSS = """

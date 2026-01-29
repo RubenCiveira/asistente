@@ -7,6 +7,7 @@ from pathlib import Path
 
 from app.ui.textual.path_dialog import PathDialog
 from app.ui.textual.form import FormDialog
+from app.ui.textual.confirm import Confirm
 from app.context.project import Project
 
 _NEW_PROJECT = "__new__"
@@ -72,6 +73,16 @@ class SelectProject:
         )
         if result is None:
             return None
+        if not result.exists():
+            confirmed = await self.window.push_screen_wait( Confirm(
+                title="No existe el directorio",
+                subtitle="Vamos a crear el directorio para el proyecto indicado",
+                ok_text="Crear directorio",
+                cancel_text="Cancelar",
+            ))
+            if not confirmed:
+                result = await self.new_project()
+                return result
         try:
             return Project.load_or_create(result)
         except Exception as e:

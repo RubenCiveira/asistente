@@ -1,4 +1,5 @@
 import json
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from datetime import datetime
@@ -19,24 +20,35 @@ class Project:
     # --------- carga / guardado ---------
 
     @classmethod
-    def load_from_dir(cls, project_dir: Path) -> "Project":
-        config_path = project_dir / cls.CONFIG_RELATIVE_PATH
-
-        if not config_path.exists():
-            raise FileNotFoundError(
-                f"Project config not found: {config_path}"
+    def load_or_create(cls, project_dir: Path) -> "Project":
+        project_dir = project_dir.expanduser().resolve()
+        if not project_dir.is_dir():
+            raise NotADirectoryError(
+                f"Project directory does not exist: {project_dir}"
             )
 
-        data = json.loads(config_path.read_text())
+        config_path = project_dir / cls.CONFIG_RELATIVE_PATH
 
-        return cls(
-            id=data.get("id", str(uuid.uuid4())),
-            name=data["name"],
-            description=data.get("description", ""),
-            status=data.get("status", "active"),
+        if config_path.exists():
+            data = json.loads(config_path.read_text())
+            return cls(
+                id=data.get("id", str(uuid.uuid4())),
+                name=data.get("name", project_dir.name),
+                description=data.get("description", ""),
+                status=data.get("status", "active"),
+                root_dir=project_dir,
+                metadata=data.get("metadata", {}),
+            )
+
+        prj = cls(
+            id=str(uuid.uuid4()),
+            name=project_dir.name,
+            description="",
+            status="active",
             root_dir=project_dir,
-            metadata=data.get("metadata", {}),
         )
+        prj.save()
+        return prj
 
     def save(self):
         config_path = self.root_dir / self.CONFIG_RELATIVE_PATH

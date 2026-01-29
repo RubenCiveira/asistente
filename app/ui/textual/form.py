@@ -561,9 +561,9 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
             return w.value
 
         if isinstance(w, RadioSet):
-            btn = w.pressed_button
-            if btn:
-                return btn.id
+            for btn in w.query(RadioButton):
+                if btn.value:
+                    return btn.id
             return None
 
         return None

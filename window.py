@@ -38,7 +38,7 @@ class MainApp(App):
         self.current_workspace = None
         self.current_project = None
         self._select_project_action = SelectProject(self)
-        self._select_workspace_action = SelectWorkspace(self)
+        self._select_workspace_action = SelectWorkspace(self, self._select_project_action)
 
     def echo(self, result: Markdown | None):
         if result is not None:
@@ -48,25 +48,6 @@ class MainApp(App):
 
     def on_mount(self) -> None:
         self._refresh_header()
-
-    # def on_mount(self) -> None:
-    #     self.app_config = AppConfig.load()
-    #     self.workspace: Workspace | None = None
-
-    #     # Si hay workspace activo, intentamos cargarlo
-    #     if self.app_config.active_workspace:
-    #         try:
-    #             self.workspace = Workspace.load_or_create(
-    #                 self.app_config.active_workspace
-    #             )
-    #             self._log(f"🗂️ Workspace activo: **{self.workspace.name}**")
-    #             return
-    #         except Exception as e:
-    #             self._log(f"⚠️ Error cargando workspace activo: {e}")
-
-    #     # Si NO hay workspace, lanzar selector
-    #     self._log("ℹ️ No hay workspace activo. Selecciona uno.")
-    #     self.select_workspace_on_startup()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -81,11 +62,12 @@ class MainApp(App):
         self.sub_title = ws.name
         self.config.set_active_workspace(ws.root_dir)
         self.config.save()
-        self.echo(Markdown(f"Workspace activo: **{ws.name}**"))
         self._refresh_header()
 
     def select_project(self, prj):
+        self.current_workspace.add_project( prj.root_dir )
         self.current_project = prj
+        self.config.save()
         self._refresh_header()
 
     def action_select_project(self):

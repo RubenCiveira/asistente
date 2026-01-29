@@ -21,7 +21,7 @@ class SelectWorkspace:
         result = await self.window.push_screen_wait(
             PathDialog(
                 root_dir=Path.home(),
-                mode="read",
+                must_exist=False,
                 select="dir",
                 initial_path=initial_dir,
                 title="Select workspace directory",

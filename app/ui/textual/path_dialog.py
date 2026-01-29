@@ -70,7 +70,8 @@ class PathDialog(ModalScreen[Optional[Path]]):
         self,
         *,
         root_dir: Path,
-        mode: str = "read",              # "read" | "write"
+        must_exist: bool = True,
+        warn_if_exists: bool = False,
         select: str = "any",             # "file" | "dir" | "any"
         initial_path: Path | None = None,
         name_filter: str | None = None,  # regex sobre el nombre (p.name)
@@ -81,7 +82,8 @@ class PathDialog(ModalScreen[Optional[Path]]):
     ):
         super().__init__()
         self.root_dir = root_dir.expanduser().resolve()
-        self.mode = mode
+        self.must_exist = must_exist
+        self.warn_if_exists = warn_if_exists
         self.select = select
         self.initial_path = initial_path
         self.name_filter = re.compile(name_filter) if name_filter else None
@@ -222,7 +224,7 @@ class PathDialog(ModalScreen[Optional[Path]]):
             self._show_error("Path outside root")
             return None
 
-        if self.mode == "read" and not absolute.exists():
+        if self.must_exist and not absolute.exists():
             self._show_error("Path does not exist")
             return None
 
@@ -234,8 +236,8 @@ class PathDialog(ModalScreen[Optional[Path]]):
             self._show_error("Directory required")
             return None
 
-        if self.mode == "write" and absolute.exists():
-            self._show_error("Path exists (confirm overwrite)")
+        if self.warn_if_exists and absolute.exists():
+            self._show_error("Path already exists")
             return None
 
         if self.relative_check_path:

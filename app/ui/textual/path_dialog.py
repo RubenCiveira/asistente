@@ -76,6 +76,7 @@ class PathDialog(ModalScreen[Optional[Path]]):
         name_filter: str | None = None,  # regex sobre el nombre (p.name)
         relative_check_path: Path | None = None,
         title: str = "Select path",
+        sub_title: str = "",
         max_suggestions: int = 30,
     ):
         super().__init__()
@@ -86,6 +87,7 @@ class PathDialog(ModalScreen[Optional[Path]]):
         self.name_filter = re.compile(name_filter) if name_filter else None
         self.relative_check_path = relative_check_path
         self.title = title
+        self.sub_title = sub_title
         self.max_suggestions = max_suggestions
 
     def compose(self):
@@ -99,8 +101,9 @@ class PathDialog(ModalScreen[Optional[Path]]):
 
         yield Vertical(
             Static(self.title, id="title"),
-            Static(f"[bold]Root:[/bold] {self.root_dir}", id="root_label"),
+            Static(f"[i]{self.sub_title}[/i]", id="subtitle"),
             input_widget,
+            Static(f"[i]Root: {self.root_dir}[/i]", id="root_label"),
             # AutoComplete se monta aparte y apunta al Input como target (v4)
             AutoComplete(target=input_widget, candidates=self._candidates, id="ac"),
             Static("", id="error"),

@@ -26,7 +26,10 @@ class MainApp(App):
     @work
     async def open_file_choser(self):
         result = await self.push_screen_wait(
-            PathDialog(root_dir=Path("/Users/ruben.civeiraiglesia/"))
+            PathDialog(
+                root_dir=Path("/Users/ruben.civeiraiglesia/"),
+                sub_title="Búsqueda preparada"
+            )
         )
         self._handle_form_result(result)
 

@@ -42,24 +42,21 @@ class MainApp(App):
     def __init__(self):
         super().__init__()
         self.config = AppConfig.load()
-        self._session_counter = 0
 
         saved = self.config.sessions
         if saved:
-            self.sessions = [self._make_session() for _ in saved]
+            self.sessions = [
+                Session(id=s["id"]) if s.get("id") else Session()
+                for s in saved
+            ]
         else:
-            self.sessions = [self._make_session()]
+            self.sessions = [Session()]
 
         idx = max(0, min(self.config.active_session_index, len(self.sessions) - 1))
         self.active_session = self.sessions[idx]
 
         self._select_project_action = SelectProject(self)
         self._select_workspace_action = SelectWorkspace(self, self._select_project_action)
-
-    def _make_session(self) -> Session:
-        sid = f"session-{self._session_counter}"
-        self._session_counter += 1
-        return Session(id=sid)
 
     # ---- acceso para las acciones ----
 
@@ -91,6 +88,7 @@ class MainApp(App):
     def _save_sessions(self) -> None:
         self.config.sessions = [
             {
+                "id": s.id,
                 "workspace": str(s.workspace.root_dir) if s.workspace else None,
                 "project": str(s.project.root_dir) if s.project else None,
             }
@@ -197,7 +195,7 @@ class MainApp(App):
         self.run_worker(self._new_session())
 
     async def _new_session(self):
-        session = self._make_session()
+        session = Session()
         self.sessions.append(session)
 
         tabs = self.query_one("#tabs", TabbedContent)
@@ -229,7 +227,7 @@ class MainApp(App):
         was_last = len(self.sessions) == 1
 
         if was_last:
-            new_session = self._make_session()
+            new_session = Session()
             new_session.workspace = closing.workspace
             new_session.project = closing.project
             self.sessions.append(new_session)

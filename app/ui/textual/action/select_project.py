@@ -18,7 +18,7 @@ class SelectProject:
         self.window = window
 
     async def run(self):
-        ws = self.window.current_workspace
+        ws = self.window.get_active_workspace()
         if ws is None:
             self.window.echo(Markdown("Error: no hay workspace seleccionado."))
             return

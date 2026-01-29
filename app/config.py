@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 import json
 
 
@@ -16,6 +16,8 @@ class AppConfig:
     config_path: Path
     active_workspace: Optional[Path] = None
     recent_workspaces: List[Path] = field(default_factory=list)
+    sessions: List[Dict[str, Optional[str]]] = field(default_factory=list)
+    active_session_index: int = 0
 
     # ---------- load / save ----------
 
@@ -32,6 +34,8 @@ class AppConfig:
             config_path=path,
             active_workspace=Path(data["active_workspace"]) if data.get("active_workspace") else None,
             recent_workspaces=[Path(p) for p in data.get("recent_workspaces", [])],
+            sessions=data.get("sessions", []),
+            active_session_index=data.get("active_session_index", 0),
         )
 
     def save(self) -> None:
@@ -40,6 +44,8 @@ class AppConfig:
         payload = {
             "active_workspace": str(self.active_workspace) if self.active_workspace else None,
             "recent_workspaces": [str(p) for p in self.recent_workspaces],
+            "sessions": self.sessions,
+            "active_session_index": self.active_session_index,
         }
 
         self.config_path.write_text(json.dumps(payload, indent=2))

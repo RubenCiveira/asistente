@@ -1,3 +1,36 @@
+"""Textual modal form dialog driven by JSON Schema.
+
+This module provides :class:`FormDialog`, a :class:`~textual.screen.ModalScreen`
+that renders a wizard-style form whose fields are derived from a JSON Schema
+(Draft 2020-12).  Each property in the schema becomes one step of the wizard.
+The dialog validates each field incrementally before advancing, and performs a
+full-schema validation before returning the final result.
+
+Supported field types
+---------------------
+* **string / integer / number** — rendered as :class:`~textual.widgets.Input`.
+* **boolean** — rendered as :class:`~textual.widgets.Checkbox`.
+* **enum** / **oneOf** — rendered as :class:`~textual.widgets.RadioSet`.
+* **array with enum/oneOf items** — rendered as
+  :class:`~textual.widgets.SelectionList` (multi-select).
+* **array with free-text items** — rendered as a
+  :class:`~textual.widgets.ListView` + :class:`~textual.widgets.Input`
+  combination.  Users can navigate items with the arrow keys and remove
+  a highlighted item by pressing backspace when the input is empty.
+
+Usage example::
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "count": {"type": "integer", "minimum": 1},
+        },
+        "required": ["name"],
+    }
+    result = await app.push_screen_wait(FormDialog(schema))
+"""
+
 from typing import Any, Dict, List, Optional
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
@@ -19,9 +52,28 @@ from jsonschema import Draft202012Validator, validate, ValidationError
 
 
 class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
-    """
-    Modal Textual dialog that renders a JSON-Schema-driven form
+    """Modal Textual dialog that renders a JSON-Schema-driven form
     with incremental validation.
+
+    The dialog walks the user through one field at a time, validating
+    each answer before advancing to the next.  Navigation is performed
+    with *Next* / *Back* buttons or keyboard shortcuts (Enter / Escape).
+
+    Parameters
+    ----------
+    schema:
+        A JSON Schema (Draft 2020-12) ``object`` definition.  The
+        ``properties`` key determines the fields shown and their order.
+    initial_values:
+        Optional mapping of ``{field_name: value}`` used to pre-populate
+        widgets.  Values survive back-navigation because an immutable copy
+        is stored separately.
+
+    Returns
+    -------
+    Optional[Dict[str, Any]]
+        The collected form data on success, or ``None`` if the user
+        cancels.
     """
 
     BINDINGS = [
@@ -93,6 +145,11 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
     # ============================================================
 
     def compose(self) -> ComposeResult:
+        """Build the static widget tree.
+
+        The actual per-field widgets are mounted dynamically by
+        :meth:`_render_field` inside the ``#field`` placeholder.
+        """
         with Vertical(id="dialog"):
             yield Static("Formulario", id="title")
             yield Static("", id="field")
@@ -102,6 +159,7 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
                 yield Button("Next →", id="next", variant="primary")
 
     def on_mount(self) -> None:
+        """Render the first field once the dialog is mounted."""
         self._render_field()
 
     # ============================================================
@@ -109,6 +167,7 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
     # ============================================================
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Dispatch button clicks to the appropriate action."""
         match event.button.id:
             case "back":
                 self.action_back_or_cancel()
@@ -118,6 +177,9 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
                 self._add_array_item()
 
     def _is_free_text_array(self) -> bool:
+        """Return ``True`` if the current field is an array without
+        predefined options (i.e. not a multi-select).
+        """
         field = self.field_order[self.index]
         spec = self.properties[field]
         if spec.get("type") != "array":
@@ -126,6 +188,15 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
         return "oneOf" not in items_spec and "enum" not in items_spec
 
     def on_key(self, event) -> None:
+        """Handle keyboard shortcuts.
+
+        For free-text array fields the arrow keys navigate the item
+        list and backspace (when the input is empty) removes the
+        currently highlighted item.
+
+        For all other widget types, pressing Enter on a non-input
+        widget submits the current field.
+        """
         if self._is_free_text_array():
             try:
                 lv = self.query_one("#array-items", ListView)
@@ -161,6 +232,11 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
                 self._submit_current()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle the Enter key inside an :class:`Input` widget.
+
+        For the array input, Enter adds the current text as a new item
+        if it is non-empty; otherwise it submits the whole field.
+        """
         if event.input.id == "array-input":
             if event.input.value.strip():
                 self._add_array_item()
@@ -170,6 +246,13 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
             self._submit_current()
 
     def _get_initial_value(self, field: str):
+        """Return the initial value for *field*.
+
+        Resolution order:
+        1. ``self.data`` — values already submitted in this session.
+        2. ``self._initial_values`` — values passed via the constructor.
+        3. The ``default`` keyword from the schema property.
+        """
         if field in self.data:
             return self.data[field]
         if field in self._initial_values:
@@ -177,6 +260,12 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
         return self.properties[field].get("default")
 
     def _add_array_item(self):
+        """Read the array input, validate and append to the current list.
+
+        The new value is cast to the type declared in ``items.type``,
+        validated against the ``items`` sub-schema and checked for
+        uniqueness when ``uniqueItems`` is ``true``.
+        """
         try:
             inp = self.query_one("#array-input", Input)
         except Exception:
@@ -218,6 +307,19 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
         inp.focus()
 
     def _remove_array_item(self, lv: ListView, idx: int) -> None:
+        """Remove the item at *idx* from both the backing list and the
+        :class:`ListView`.
+
+        After removal the highlight is adjusted so that it stays on a
+        valid index (or becomes ``None`` if the list is now empty).
+
+        Parameters
+        ----------
+        lv:
+            The :class:`ListView` widget showing the array items.
+        idx:
+            Zero-based index of the item to remove.
+        """
         if idx < 0 or idx >= len(self._array_values):
             return
         self._array_values.pop(idx)
@@ -228,6 +330,12 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
             lv.index = len(self._array_values) - 1
 
     def _go_back(self):
+        """Navigate to the previous field.
+
+        The submitted value for the previous field is removed from
+        ``self.data`` so that the user can re-enter it.  Original
+        initial values are preserved in ``self._initial_values``.
+        """
         if self.index == 0:
             return
         field = self.field_order[self.index - 1]
@@ -236,6 +344,9 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
         self._render_field()
 
     def action_back_or_cancel(self) -> None:
+        """Bound to *Escape*.  Goes back one field or cancels the
+        dialog if already on the first field.
+        """
         if self.index == 0:
             self.dismiss(None)
         else:
@@ -246,6 +357,23 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
     # ============================================================
 
     def _render_field(self):
+        """Replace the contents of the ``#field`` container with the
+        widget(s) appropriate for the current schema property.
+
+        The method inspects the property spec to decide which widget to
+        use:
+
+        * ``oneOf`` / ``enum`` → :class:`RadioSet`
+        * ``type: boolean`` → :class:`Checkbox`
+        * ``type: array`` with ``oneOf``/``enum`` items →
+          :class:`SelectionList`
+        * ``type: array`` (free text) → :class:`ListView` +
+          :class:`Input`
+        * everything else → :class:`Input`
+
+        After mounting, the *Back* / *Next* button labels are updated
+        and focus is moved to the new widget.
+        """
         container = self.query_one("#field", Static)
         container.remove_children()
         self.query_one("#errors", Static).update("")
@@ -354,6 +482,13 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
     # ============================================================
 
     def _submit_current(self):
+        """Validate and store the current field, then advance.
+
+        If the field value is ``None`` and there is a schema default it
+        is used.  Optional fields that are left blank are skipped.
+        When all fields have been collected, a final full-schema
+        validation is performed before dismissing the dialog.
+        """
         field = self.field_order[self.index]
         spec = self.properties[field]
 
@@ -398,6 +533,14 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
         self._render_field()
 
     def _read_widget_value(self):
+        """Extract the current value from the active widget.
+
+        Returns
+        -------
+        Any
+            The typed value, or ``None`` when the widget is empty /
+            has no selection.
+        """
         field = self.field_order[self.index]
         spec = self.properties[field]
         w = self.current_widget
@@ -426,6 +569,25 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
         return None
 
     def _validate_field_incremental(self, field_name: str, candidate_value: Any) -> List[str]:
+        """Validate *candidate_value* for *field_name* against a sub-schema
+        that only includes fields seen so far.
+
+        This enables cross-field constraints (``allOf``, ``if``/``then``,
+        etc.) to fire as soon as the relevant fields have been filled in,
+        without requiring all fields to be present.
+
+        Parameters
+        ----------
+        field_name:
+            Name of the property being validated.
+        candidate_value:
+            The value the user entered for this field.
+
+        Returns
+        -------
+        List[str]
+            A list of human-readable error messages.  Empty when valid.
+        """
         idx = self.field_order.index(field_name)
         visible = set(self.field_order[: idx + 1])
 
@@ -451,6 +613,27 @@ class FormDialog(ModalScreen[Optional[Dict[str, Any]]]):
     # ============================================================
 
     def _cast_value(self, raw: str, field_type: str):
+        """Convert the raw string *raw* to the Python type implied by
+        *field_type*.
+
+        Parameters
+        ----------
+        raw:
+            The non-empty string entered by the user.
+        field_type:
+            One of ``"string"``, ``"integer"``, ``"number"`` or
+            ``"boolean"``.
+
+        Returns
+        -------
+        str | int | float | bool
+            The converted value.
+
+        Raises
+        ------
+        ValueError
+            If the conversion fails or the type is unsupported.
+        """
         if field_type == "string":
             return raw
         if field_type == "integer":

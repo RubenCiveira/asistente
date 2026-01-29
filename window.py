@@ -9,6 +9,11 @@ from pathlib import Path
 from app.ui.textual.form import FormDialog
 from app.ui.textual.path_dialog import PathDialog
 
+from app.config import AppConfig, default_workspaces_dir
+
+from app.ui.textual.action.test.test_path import TestPath
+from app.ui.textual.action.test.test_form import TestForm
+
 class MainApp(App):
     CSS = """
     #chat {
@@ -22,163 +27,35 @@ class MainApp(App):
         border: round $accent;
     }
     """
+    def __init__(self):
+        super().__init__()
+        self.test_path = TestPath(self)
+        self.test_form = TestForm(self)
 
-    @work
-    async def open_file_choser(self):
-        result = await self.push_screen_wait(
-            PathDialog(
-                root_dir=Path("/Users/ruben.civeiraiglesia/"),
-                sub_title="Búsqueda preparada"
-            )
-        )
-        self._handle_form_result(result)
+    def echo(self, result: Markdown | None):
+        if result is not None:
+            chat = self.query_one("#chat", VerticalScroll)
+            chat.mount(result)
+            chat.scroll_end(animate=False)
 
-    @work
-    async def open_form_worker(self):
-        schema = {
-            "type": "object",
-            "properties": {
-                "paths": {
-                    "type": "array",
-                    "description": "Directorios a analizar",
-                    "minItems": 1,
-                    "maxItems": 10,
-                    "uniqueItems": True,
-                    "items": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 200,
-                        # path "simple": evita espacios raros; permite / . _ - letras números
-                        "pattern": r"^[a-zA-Z0-9._/\-]+$",
-                    },
-                },
-                "repo_url": {
-                    "type": "string",
-                    "description": "Git repository URL (https://... o git@...)",
-                    # Valida URLs tipo http(s) y ssh (simplificado)
-                    "pattern": r"^(https?://|git@).+",
-                    "minLength": 8,
-                    "maxLength": 300,
-                },
-                "lang": {
-                    "type": "string",
-                    "enum": ["es", "en"],
-                    "default": "es",
-                    "description": "Idioma principal",
-                },
-                "mode": {
-                    "oneOf": [
-                        {"const": "generic", "title": "Uso general"},
-                        {"const": "coding", "title": "Programación"},
-                        {"const": "reasoning", "title": "Razonamiento"},
-                    ],
-                    "default": "generic",
-                },
-                "features": {
-                    "type": "array",
-                    "items": {
-                        "oneOf": [
-                            {"const": "lint", "title": "Linting"},
-                            {"const": "tests", "title": "Tests"},
-                            {"const": "docs", "title": "Documentación"},
-                        ]
-                    },
-                    "minItems": 1,
-                    "maxItems": 3,
-                    "uniqueItems": True,
-                },
-                "branch": {
-                    "type": "string",
-                    "default": "main",
-                    # muy simplificado pero útil: evita espacios y caracteres peligrosos
-                    "pattern": r"^[A-Za-z0-9._/\-]+$",
-                    "minLength": 1,
-                    "maxLength": 120,
-                },
-                "private": {
-                    "type": "boolean",
-                    "default": False,
-                },
-                "repo_token": {
-                    "type": "string",
-                    "description": "Token de acceso si el repo es privado",
-                    "minLength": 10,
-                    "maxLength": 200,
-                },
-                "depth": {
-                    "type": "integer",
-                    "default": 1,
-                    "minimum": 1,
-                    "maximum": 50,
-                },
-            },
-            "required": ["repo_url"],
+    # def on_mount(self) -> None:
+    #     self.app_config = AppConfig.load()
+    #     self.workspace: Workspace | None = None
 
-            # --------------------------
-            # Validación cruzada (pro)
-            # --------------------------
-            "allOf": [
-                # Si private=true, exigir repo_token
-                {
-                    "if": {
-                        "properties": {"private": {"const": True}},
-                        "required": ["private"],
-                    },
-                    "then": {"required": ["repo_token"]},
-                },
+    #     # Si hay workspace activo, intentamos cargarlo
+    #     if self.app_config.active_workspace:
+    #         try:
+    #             self.workspace = Workspace.load_or_create(
+    #                 self.app_config.active_workspace
+    #             )
+    #             self._log(f"🗂️ Workspace activo: **{self.workspace.name}**")
+    #             return
+    #         except Exception as e:
+    #             self._log(f"⚠️ Error cargando workspace activo: {e}")
 
-                # Si mode=coding, exigir que features contenga "tests"
-                # (JSON Schema 2020-12: contains)
-                {
-                    "if": {
-                        "properties": {"mode": {"const": "coding"}},
-                        "required": ["mode"],
-                    },
-                    "then": {
-                        "properties": {
-                            "features": {
-                                "contains": {"const": "tests"}
-                            }
-                        }
-                    },
-                },
-
-                # Ejemplo de restricción: si lang=en, no permitir mode=reasoning
-                {
-                    "if": {
-                        "properties": {"lang": {"const": "en"}},
-                        "required": ["lang"],
-                    },
-                    "then": {
-                        "not": {
-                            "properties": {"mode": {"const": "reasoning"}},
-                            "required": ["mode"],
-                        }
-                    },
-                },
-            ],
-        }
-        initial_values = {
-            "repo_url": "https://github.com/tu-org/tu-repo",
-            "paths": ["src", "tests"],
-            "lang": "es",
-            "mode": "coding",
-            "features": ["tests", "lint"],
-            "branch": "main",
-            "private": False,
-            "depth": 3,
-        }
-
-        result = await self.push_screen_wait(FormDialog(schema, initial_values))
-        self._handle_form_result(result)
-
-    def _handle_form_result(self, result):
-        chat = self.query_one("#chat", VerticalScroll)
-        if result is None:
-            chat.mount(Markdown("Formulario cancelado."))
-        else:
-            chat.mount(Markdown(str(result)))
-        chat.scroll_end(animate=False)
+    #     # Si NO hay workspace, lanzar selector
+    #     self._log("ℹ️ No hay workspace activo. Selecciona uno.")
+    #     self.select_workspace_on_startup()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -198,9 +75,9 @@ class MainApp(App):
             chat.remove_children()
 
         if event.button.id == "open_form":
-            self.open_form_worker()
+            self.run_worker( self.test_form.open_form_worker() )
         if event.button.id == "select_file":
-            self.open_file_choser()
+            self.run_worker( self.test_path.open_file_choser() )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id != "prompt":
@@ -213,6 +90,41 @@ class MainApp(App):
         chat.scroll_end(animate=False)
         event.input.value = ""
 
+    def _log(self, text: str) -> None:
+        chat = self.query_one("#chat", VerticalScroll)
+        chat.mount(Markdown(text))
+        chat.scroll_end(animate=False)
+
+    @work
+    async def select_workspace_on_startup(self):
+        initial_dir = default_workspaces_dir()
+        initial_dir.mkdir(parents=True, exist_ok=True)
+
+        result = await self.push_screen_wait(
+            PathDialog(
+                root_dir=Path.home(),          # 🔒 restringido al HOME
+                mode="read",
+                select="dir",                  # 📁 solo directorios
+                initial_path=initial_dir,      # 🎯 valor inicial
+                title="Select workspace directory",
+            )
+        )
+
+        if result is None:
+            self._log("❌ No workspace selected. Application will run without workspace.")
+            return
+
+        try:
+            ws = Workspace.load_or_create(result)
+        except Exception as e:
+            self._log(f"❌ Cannot create workspace: {e}")
+            return
+
+        self.workspace = ws
+        self.app_config.set_active_workspace(result)
+        self.app_config.save()
+
+        self._log(f"✅ Workspace activo: **{ws.name}**")
 
 if __name__ == "__main__":
     MainApp().run()

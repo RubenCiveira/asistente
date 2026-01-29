@@ -5,7 +5,9 @@ from textual.widgets import Header, Footer, Input, Static, Button, Markdown
 from textual.containers import Vertical, Horizontal, VerticalScroll
 from textual import work
 
+from pathlib import Path
 from app.ui.textual.form import FormDialog
+from app.ui.textual.path_dialog import PathDialog
 
 class MainApp(App):
     CSS = """
@@ -20,6 +22,13 @@ class MainApp(App):
         border: round $accent;
     }
     """
+
+    @work
+    async def open_file_choser(self):
+        result = await self.push_screen_wait(
+            PathDialog(root_dir=Path("/Users/ruben.civeiraiglesia/"))
+        )
+        self._handle_form_result(result)
 
     @work
     async def open_form_worker(self):
@@ -175,6 +184,7 @@ class MainApp(App):
                 yield Markdown("Listo. Aquí irá el chat/log en **Markdown**.")
             with Horizontal():
                 yield Button("Open Form", id="open_form", variant="primary")
+                yield Button("Select file", id="select_file")
                 yield Button("Clear", id="clear_chat")
             yield Input(placeholder="Escribe aquí… (Enter para enviar)", id="prompt")
         yield Footer()
@@ -186,6 +196,8 @@ class MainApp(App):
 
         if event.button.id == "open_form":
             self.open_form_worker()
+        if event.button.id == "select_file":
+            self.open_file_choser()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id != "prompt":

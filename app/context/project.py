@@ -1,20 +1,50 @@
-from typing import Optional
+from typing import Dict, Any, Optional
+
 
 @dataclass
 class Project:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    name: str = ""
-    description: str = ""
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    id: str
+    name: str
+    description: str
+    status: str
 
-    # Estado funcional
-    status: str = "active"  # active | paused | completed
+    root_dir: Path
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    # Datos propios del proyecto
-    metadata: dict = field(default_factory=dict)
+    CONFIG_RELATIVE_PATH = Path(".conf/assistants/project.json")
 
-    # Enlace a sesiones de chat/agentes
-    chat_sessions: List[str] = field(default_factory=list)
+    # --------- carga / guardado ---------
 
-    def add_chat_session(self, session_id: str):
-        self.chat_sessions.append(session_id)
+    @classmethod
+    def load_from_dir(cls, project_dir: Path) -> "Project":
+        config_path = project_dir / cls.CONFIG_RELATIVE_PATH
+
+        if not config_path.exists():
+            raise FileNotFoundError(
+                f"Project config not found: {config_path}"
+            )
+
+        data = json.loads(config_path.read_text())
+
+        return cls(
+            id=data.get("id", str(uuid.uuid4())),
+            name=data["name"],
+            description=data.get("description", ""),
+            status=data.get("status", "active"),
+            root_dir=project_dir,
+            metadata=data.get("metadata", {}),
+        )
+
+    def save(self):
+        config_path = self.root_dir / self.CONFIG_RELATIVE_PATH
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        payload = {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "status": self.status,
+            "metadata": self.metadata,
+        }
+
+        config_path.write_text(json.dumps(payload, indent=2))

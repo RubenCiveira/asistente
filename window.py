@@ -3,16 +3,9 @@ from __future__ import annotations
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, Static, Button, Markdown
 from textual.containers import Vertical, Horizontal, VerticalScroll
-from textual import work
-
-from pathlib import Path
-from app.ui.textual.form import FormDialog
-from app.ui.textual.path_dialog import PathDialog
-
-from app.config import AppConfig, default_workspaces_dir
-
 from app.ui.textual.action.test.test_path import TestPath
 from app.ui.textual.action.test.test_form import TestForm
+from app.ui.textual.action.select_workspace import SelectWorkspace
 
 class MainApp(App):
     CSS = """
@@ -29,8 +22,10 @@ class MainApp(App):
     """
     def __init__(self):
         super().__init__()
+        self.current_workspace = None
         self.test_path = TestPath(self)
         self.test_form = TestForm(self)
+        self.select_workspace = SelectWorkspace(self)
 
     def echo(self, result: Markdown | None):
         if result is not None:
@@ -65,19 +60,22 @@ class MainApp(App):
             with Horizontal():
                 yield Button("Open Form", id="open_form", variant="primary")
                 yield Button("Select file", id="select_file")
+                yield Button("Workspace", id="select_workspace")
                 yield Button("Clear", id="clear_chat")
             yield Input(placeholder="Escribe aquí… (Enter para enviar)", id="prompt")
         yield Footer()
 
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
+    async def on_button_pressed(self, evesolont: Button.Pressed) -> None:
         if event.button.id == "clear_chat":
             chat = self.query_one("#chat", VerticalScroll)
             chat.remove_children()
 
         if event.button.id == "open_form":
-            self.run_worker( self.test_form.open_form_worker() )
+            self.run_worker( self.test_form.run() )
         if event.button.id == "select_file":
-            self.run_worker( self.test_path.open_file_choser() )
+            self.run_worker( self.test_path.run() )
+        if event.button.id == "select_workspace":
+            self.run_worker( self.select_workspace.run() )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id != "prompt":
@@ -95,36 +93,6 @@ class MainApp(App):
         chat.mount(Markdown(text))
         chat.scroll_end(animate=False)
 
-    @work
-    async def select_workspace_on_startup(self):
-        initial_dir = default_workspaces_dir()
-        initial_dir.mkdir(parents=True, exist_ok=True)
-
-        result = await self.push_screen_wait(
-            PathDialog(
-                root_dir=Path.home(),          # 🔒 restringido al HOME
-                mode="read",
-                select="dir",                  # 📁 solo directorios
-                initial_path=initial_dir,      # 🎯 valor inicial
-                title="Select workspace directory",
-            )
-        )
-
-        if result is None:
-            self._log("❌ No workspace selected. Application will run without workspace.")
-            return
-
-        try:
-            ws = Workspace.load_or_create(result)
-        except Exception as e:
-            self._log(f"❌ Cannot create workspace: {e}")
-            return
-
-        self.workspace = ws
-        self.app_config.set_active_workspace(result)
-        self.app_config.save()
-
-        self._log(f"✅ Workspace activo: **{ws.name}**")
 
 if __name__ == "__main__":
     MainApp().run()

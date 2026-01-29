@@ -91,7 +91,11 @@ class PathDialog(ModalScreen[Optional[Path]]):
         self.max_suggestions = max_suggestions
 
     def compose(self):
-        initial = str(self.initial_path) if self.initial_path else ""
+        if self.initial_path:
+            resolved = self.initial_path.expanduser().resolve()
+            initial = "/" + str(resolved.relative_to(self.root_dir))
+        else:
+            initial = ""
 
         input_widget = Input(
             placeholder=str(self.root_dir),

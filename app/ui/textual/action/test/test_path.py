@@ -15,7 +15,7 @@ class TestPath:
     def __init__(self, window: App):
         self.window = window
 
-    async def open_file_choser(self) -> Markdown:
+    async def run(self):
         result = await self.window.push_screen_wait(
             PathDialog(
                 root_dir=Path("/Users/ruben.civeiraiglesia/"),

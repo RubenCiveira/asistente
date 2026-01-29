@@ -15,7 +15,7 @@ class TestForm:
     def __init__(self, window: App):
         self.window = window
 
-    async def open_form_worker(self) -> Markdown:
+    async def run(self):
         schema = {
             "type": "object",
             "properties": {

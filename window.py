@@ -6,6 +6,8 @@ from textual.containers import Vertical, Horizontal, VerticalScroll
 from app.ui.textual.action.select_project import SelectProject
 from app.ui.textual.action.select_workspace import SelectWorkspace
 from app.config import AppConfig, default_workspaces_dir
+from app.context.workspace import Workspace
+from app.context.project import Project
 
 class MainApp(App):
     CSS = """
@@ -47,6 +49,15 @@ class MainApp(App):
             chat.scroll_end(animate=False)
 
     def on_mount(self) -> None:
+        if self.config.active_workspace and self.config.active_workspace.exists():
+            try:
+                ws = Workspace.load_or_create(self.config.active_workspace)
+                self.current_workspace = ws
+                if ws.active_project and ws.active_project.exists():
+                    prj = Project.load_or_create(ws.active_project)
+                    self.current_project = prj
+            except Exception:
+                pass
         self._refresh_header()
 
     def compose(self) -> ComposeResult:
@@ -65,9 +76,8 @@ class MainApp(App):
         self._refresh_header()
 
     def select_project(self, prj):
-        self.current_workspace.add_project( prj.root_dir )
+        self.current_workspace.set_active_project(prj.root_dir)
         self.current_project = prj
-        self.config.save()
         self._refresh_header()
 
     def action_select_project(self):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Static, Button, Markdown
+from textual.widgets import Header, Footer, Input, Static, Button, Markdown, Label
 from textual.containers import Vertical, Horizontal, VerticalScroll
 from app.ui.textual.action.test.test_path import TestPath
 from app.ui.textual.action.test.test_form import TestForm
@@ -20,11 +20,24 @@ class MainApp(App):
     #prompt {
         border: round $accent;
     }
+
+    #status_bar {
+        dock: bottom;
+        height: 1;
+    }
     """
+
+    BINDINGS = [
+        ("ctrl+w", "select_workspace", "Workspace"),
+        ("ctrl+p", "select_project", "Project"),
+        ("ctrl+q", "quit", "Quit"),
+    ]
+
     def __init__(self):
         super().__init__()
         self.config = AppConfig.load()
         self.current_workspace = None
+        self.current_project = None
         self.test_path = TestPath(self)
         self.test_form = TestForm(self)
         self._select_workspace_action = SelectWorkspace(self)
@@ -34,6 +47,9 @@ class MainApp(App):
             chat = self.query_one("#chat", VerticalScroll)
             chat.mount(result)
             chat.scroll_end(animate=False)
+
+    def on_mount(self) -> None:
+        self._refresh_header()
 
     # def on_mount(self) -> None:
     #     self.app_config = AppConfig.load()
@@ -59,13 +75,8 @@ class MainApp(App):
         with Vertical():
             with VerticalScroll(id="chat"):
                 yield Markdown("Listo. Aquí irá el chat/log en **Markdown**.")
-            with Horizontal():
-                yield Button("Open Form", id="open_form", variant="primary")
-                yield Button("Select file", id="select_file")
-                yield Button("Workspace", id="select_workspace")
-                yield Button("Clear", id="clear_chat")
             yield Input(placeholder="Escribe aquí… (Enter para enviar)", id="prompt")
-        yield Footer()
+            yield Footer()
 
     def select_workspace(self, ws):
         self.current_workspace = ws
@@ -73,18 +84,22 @@ class MainApp(App):
         self.config.set_active_workspace(ws.root_dir)
         self.config.save()
         self.echo(Markdown(f"Workspace activo: **{ws.name}**"))
+        self._refresh_header()
 
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "clear_chat":
-            chat = self.query_one("#chat", VerticalScroll)
-            chat.remove_children()
+    def action_select_workspace(self):
+        self.run_worker( self._select_workspace_action.run() )
 
-        if event.button.id == "open_form":
-            self.run_worker( self.test_form.run() )
-        if event.button.id == "select_file":
-            self.run_worker( self.test_path.run() )
-        if event.button.id == "select_workspace":
-            self.run_worker( self._select_workspace_action.run() )
+    # async def on_button_pressed(self, event: Button.Pressed) -> None:
+    #     if event.button.id == "clear_chat":
+    #         chat = self.query_one("#chat", VerticalScroll)
+    #         chat.remove_children()
+
+    #     if event.button.id == "open_form":
+    #         self.run_worker( self.test_form.run() )
+    #     if event.button.id == "select_file":
+    #         self.run_worker( self.test_path.run() )
+    #     if event.button.id == "select_workspace":
+    #         self.run_worker( self._select_workspace_action.run() )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id != "prompt":
@@ -102,6 +117,13 @@ class MainApp(App):
         chat.mount(Markdown(text))
         chat.scroll_end(animate=False)
 
+    def _refresh_header(self) -> None:
+        ws = self.current_workspace.name if self.current_workspace else "Sin workspace"
+        pr = self.current_project.name if self.current_project else "Sin projecto"
+
+        self.title = f"Asistente  ·  {ws} / {pr}"
+        self.sub_title = "Sin projecto"
+        # header.sub_title = str(self.workspace.root_dir) if self.workspace else ""
 
 if __name__ == "__main__":
     MainApp().run()

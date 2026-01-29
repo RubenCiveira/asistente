@@ -11,7 +11,6 @@ from textual.containers import Vertical, Horizontal
 from textual_autocomplete import AutoComplete, DropdownItem
 from textual_autocomplete._autocomplete import TargetState  # callback state (v4)
 
-
 class PathDialog(ModalScreen[Optional[Path]]):
     DEFAULT_CSS = """
     PathDialog {
@@ -100,6 +99,7 @@ class PathDialog(ModalScreen[Optional[Path]]):
 
         yield Vertical(
             Static(self.title, id="title"),
+            Static(f"[bold]Root:[/bold] {self.root_dir}", id="root_label"),
             input_widget,
             # AutoComplete se monta aparte y apunta al Input como target (v4)
             AutoComplete(target=input_widget, candidates=self._candidates, id="ac"),
@@ -133,22 +133,22 @@ class PathDialog(ModalScreen[Optional[Path]]):
     # ---------- AutoComplete callback (v4) ----------
 
     def _candidates(self, state):
-        text = state.text
+        text = state.text or ""
 
         try:
-            base = Path(text).expanduser()
-            if not base.is_absolute():
-                base = self.root_dir / base
-
-            base = base.resolve(strict=False)
-
-            # 🔒 root inescapable
+            # "/" significa listar root
+            rel = text.lstrip("/")
+            base = (self.root_dir / rel).resolve(strict=False)
             if not base.is_relative_to(self.root_dir):
                 return []
-
             ends_with_slash = text.endswith("/")
-
-            if ends_with_slash:
+            if rel == ".":
+                parent = self.root_dir
+                prefix = "."
+            elif rel == "/":
+                parent = self.root_dir
+                prefix = ""
+            elif ends_with_slash:
                 parent = base
                 prefix = ""
             else:
@@ -160,38 +160,45 @@ class PathDialog(ModalScreen[Optional[Path]]):
 
             items = []
 
-            # dirs primero, luego files
             entries = sorted(
                 parent.iterdir(),
                 key=lambda p: (p.is_file(), p.name.lower())
             )
-
             for p in entries:
+                p_abs = p.resolve(strict=False)
+                if not (p_abs == self.root_dir or p_abs.is_relative_to(self.root_dir)):
+                    continue
                 if self.name_filter and not self.name_filter.match(p.name):
+                    continue
+                if rel != "." and p.name.startswith("."):
                     continue
 
                 if prefix and not p.name.startswith(prefix):
                     continue
 
-                if self.select == "file" and p.is_dir():
-                    continue
+                # if self.select == "file" and p.is_dir():
+                #     continue
                 if self.select == "dir" and p.is_file():
                     continue
 
+                # 🔑 mostrar RELATIVO
+                rel_path = p.relative_to(self.root_dir)
+
                 items.append(
                     DropdownItem(
-                        main=str(p),
+                        main="/" + str(rel_path),
                         prefix="📁 " if p.is_dir() else "📄 ",
                     )
                 )
 
                 if len(items) >= self.max_suggestions:
                     break
-
             return items
 
         except Exception:
+            raise
             return []
+
 
     # ---------- Validation / Accept ----------
 
@@ -204,39 +211,40 @@ class PathDialog(ModalScreen[Optional[Path]]):
     def _validate(self, raw: str) -> Optional[Path]:
         self._show_error("")
 
-        path = Path(raw).expanduser()
-        if not path.is_absolute():
-            path = self.root_dir / path
-        path = path.resolve(strict=False)
+        absolute = self._to_absolute(raw)
 
-        if not path.is_relative_to(self.root_dir):
+        if not absolute.is_relative_to(self.root_dir):
             self._show_error("Path outside root")
             return None
 
-        if self.mode == "read" and not path.exists():
+        if self.mode == "read" and not absolute.exists():
             self._show_error("Path does not exist")
             return None
 
-        if self.select == "file" and path.exists() and not path.is_file():
+        if self.select == "file" and absolute.exists() and not absolute.is_file():
             self._show_error("File required")
             return None
 
-        if self.select == "dir" and path.exists() and not path.is_dir():
+        if self.select == "dir" and absolute.exists() and not absolute.is_dir():
             self._show_error("Directory required")
             return None
 
-        if self.mode == "write" and path.exists():
-            # Por ahora: bloquea. Luego lo convertimos a confirmación Sí/No.
-            self._show_error("Path exists (TODO: confirm overwrite)")
+        if self.mode == "write" and absolute.exists():
+            self._show_error("Path exists (confirm overwrite)")
             return None
 
         if self.relative_check_path:
-            check = path / self.relative_check_path
+            check = absolute / self.relative_check_path
             if check.exists():
                 self._show_error(f"'{self.relative_check_path}' already exists")
                 return None
 
-        return path
+        return absolute
+
 
     def _show_error(self, msg: str) -> None:
         self.query_one("#error", Static).update(f"[red]{msg}[/red]" if msg else "")
+
+    def _to_absolute(self, relative: str) -> Path:
+        rel = relative.lstrip("/")  # "/" → ""
+        return (self.root_dir / rel).resolve(strict=False)

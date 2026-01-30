@@ -81,7 +81,7 @@ class SelectProject:
             chosen = result["project"]
             if chosen != _NEW_PROJECT:
                 try:
-                    return Project.load_or_create(path_by_key[chosen])
+                    return Project.load_or_create(path_by_key[chosen], valid_topics=self.window.config.topic_names())
                 except Exception as e:
                     self.window.echo(Markdown(f"Cannot load project: {e}"))
                     return None
@@ -118,7 +118,7 @@ class SelectProject:
                 result = await self.new_project()
                 return result
         try:
-            return Project.load_or_create(result)
+            return Project.load_or_create(result, valid_topics=self.window.config.topic_names())
         except Exception as e:
             self.window.echo(Markdown(f"Cannot create project: {e}"))
             return None

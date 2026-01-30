@@ -81,7 +81,7 @@ class SelectWorkspace:
             chosen = result["workspace"]
             if chosen != _NEW_WORKSPACE:
                 try:
-                    return Workspace.load_or_create(path_by_key[chosen])
+                    return Workspace.load_or_create(path_by_key[chosen], valid_topics=self.window.config.topic_names())
                 except Exception as e:
                     self.window.echo(Markdown(f"Cannot load workspace: {e}"))
                     return None
@@ -109,7 +109,7 @@ class SelectWorkspace:
         if result is None:
             return None
         try:
-            return Workspace.load_or_create(result)
+            return Workspace.load_or_create(result, valid_topics=self.window.config.topic_names())
         except Exception as e:
             self.window.echo(Markdown(f"Cannot create workspace: {e}"))
             return

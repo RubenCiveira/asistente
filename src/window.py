@@ -158,6 +158,7 @@ class MainApp(App):
     def on_mount(self) -> None:
         """Restore workspace/project references for every session from config."""
         saved = self.config.sessions
+        vt = self.config.topic_names()
         for i, session in enumerate(self.sessions):
             if i < len(saved):
                 ws_path = saved[i].get("workspace")
@@ -166,12 +167,12 @@ class MainApp(App):
                     p = Path(ws_path)
                     if p.exists():
                         try:
-                            ws = Workspace.load_or_create(p)
+                            ws = Workspace.load_or_create(p, valid_topics=vt)
                             session.workspace = ws
                             if prj_path:
                                 pp = Path(prj_path)
                                 if pp.exists():
-                                    prj = Project.load_or_create(pp)
+                                    prj = Project.load_or_create(pp, valid_topics=vt)
                                     session.project = prj
                         except Exception:
                             pass
@@ -179,10 +180,10 @@ class MainApp(App):
         # Compatibilidad: si no habia sesiones guardadas, cargar workspace por defecto
         if not saved and self.config.active_workspace and self.config.active_workspace.exists():
             try:
-                ws = Workspace.load_or_create(self.config.active_workspace)
+                ws = Workspace.load_or_create(self.config.active_workspace, valid_topics=vt)
                 self.active_session.workspace = ws
                 if ws.active_project and ws.active_project.exists():
-                    prj = Project.load_or_create(ws.active_project)
+                    prj = Project.load_or_create(ws.active_project, valid_topics=vt)
                     self.active_session.project = prj
             except Exception:
                 pass

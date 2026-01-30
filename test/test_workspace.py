@@ -36,6 +36,10 @@ class TestWorkspaceLoadOrCreate:
         ws = Workspace.load_or_create(tmp_path / "ws")
         assert ws.active_project is None
 
+    def test_default_topics_empty(self, tmp_path):
+        ws = Workspace.load_or_create(tmp_path / "ws")
+        assert ws.topics == []
+
 
 class TestWorkspaceAddProject:
     def test_add_project(self, tmp_path):
@@ -87,3 +91,51 @@ class TestWorkspaceSave:
         ws.save()
         data = json.loads((ws_dir / "workspace.json").read_text())
         assert data["name"] == "custom"
+
+
+class TestWorkspaceTopics:
+    def test_topics_round_trip(self, tmp_path):
+        ws_dir = tmp_path / "ws"
+        ws = Workspace.load_or_create(ws_dir)
+        ws.topics = ["docs", "code"]
+        ws.save()
+        ws2 = Workspace.load_or_create(ws_dir)
+        assert ws2.topics == ["docs", "code"]
+
+    def test_topics_pruned_on_load(self, tmp_path):
+        ws_dir = tmp_path / "ws"
+        ws_dir.mkdir(parents=True)
+        (ws_dir / "workspace.json").write_text(json.dumps({
+            "name": "ws",
+            "created_at": "2025-01-01",
+            "projects": [],
+            "active_project": None,
+            "topics": ["valid", "stale", "also_valid"],
+        }))
+        ws = Workspace.load_or_create(ws_dir, valid_topics={"valid", "also_valid"})
+        assert ws.topics == ["valid", "also_valid"]
+        # Should have re-saved
+        data = json.loads((ws_dir / "workspace.json").read_text())
+        assert data["topics"] == ["valid", "also_valid"]
+
+    def test_topics_not_pruned_without_valid_topics(self, tmp_path):
+        ws_dir = tmp_path / "ws"
+        ws_dir.mkdir(parents=True)
+        (ws_dir / "workspace.json").write_text(json.dumps({
+            "name": "ws",
+            "created_at": "2025-01-01",
+            "projects": [],
+            "active_project": None,
+            "topics": ["anything", "goes"],
+        }))
+        ws = Workspace.load_or_create(ws_dir)
+        assert ws.topics == ["anything", "goes"]
+
+    def test_topics_pruned_on_save(self, tmp_path):
+        ws_dir = tmp_path / "ws"
+        ws = Workspace.load_or_create(ws_dir)
+        ws.topics = ["keep", "remove"]
+        ws.save(valid_topics={"keep"})
+        assert ws.topics == ["keep"]
+        data = json.loads((ws_dir / "workspace.json").read_text())
+        assert data["topics"] == ["keep"]

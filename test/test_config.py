@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.config import AppConfig
+from app.config import AppConfig, PostgresRagConfig, Topic
 
 
 class TestAppConfigLoad:
@@ -15,6 +15,8 @@ class TestAppConfigLoad:
         assert cfg.recent_workspaces == []
         assert cfg.sessions == []
         assert cfg.active_session_index == 0
+        assert cfg.postgres_rag == PostgresRagConfig()
+        assert cfg.topics == []
 
     def test_load_existing_file(self, tmp_path):
         f = tmp_path / "cfg.json"
@@ -78,3 +80,61 @@ class TestSetActiveWorkspace:
         assert len(cfg.recent_workspaces) == 10
         # Most recent should be first
         assert cfg.recent_workspaces[0] == (tmp_path / "ws14").resolve()
+
+
+class TestPostgresRagConfig:
+    def test_round_trip(self, tmp_path):
+        f = tmp_path / "cfg.json"
+        cfg = AppConfig(config_path=f)
+        cfg.postgres_rag = PostgresRagConfig(
+            host="db.example.com",
+            port=5433,
+            database="mydb",
+            user="admin",
+            password="secret",
+            table="embeddings",
+        )
+        cfg.save()
+        loaded = AppConfig.load(f)
+        assert loaded.postgres_rag.host == "db.example.com"
+        assert loaded.postgres_rag.port == 5433
+        assert loaded.postgres_rag.database == "mydb"
+        assert loaded.postgres_rag.user == "admin"
+        assert loaded.postgres_rag.password == "secret"
+        assert loaded.postgres_rag.table == "embeddings"
+
+    def test_defaults(self):
+        pg = PostgresRagConfig()
+        assert pg.host == "localhost"
+        assert pg.port == 5432
+        assert pg.database == ""
+
+
+class TestTopics:
+    def test_round_trip(self, tmp_path):
+        f = tmp_path / "cfg.json"
+        cfg = AppConfig(config_path=f)
+        cfg.topics = [
+            Topic(name="docs", type="directory", path="/data/docs"),
+            Topic(name="code", type="directory", path="/data/code"),
+        ]
+        cfg.save()
+        loaded = AppConfig.load(f)
+        assert len(loaded.topics) == 2
+        assert loaded.topics[0].name == "docs"
+        assert loaded.topics[0].type == "directory"
+        assert loaded.topics[0].path == "/data/docs"
+        assert loaded.topics[1].name == "code"
+
+    def test_topic_names(self, tmp_path):
+        cfg = AppConfig(config_path=tmp_path / "c.json")
+        cfg.topics = [
+            Topic(name="a"),
+            Topic(name="b"),
+            Topic(name="c"),
+        ]
+        assert cfg.topic_names() == {"a", "b", "c"}
+
+    def test_topic_names_empty(self, tmp_path):
+        cfg = AppConfig(config_path=tmp_path / "c.json")
+        assert cfg.topic_names() == set()

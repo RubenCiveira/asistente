@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from textual.widgets import Static
+from textual.containers import VerticalScroll
+from textual.widgets import Static, Tree
 
 from app.ui.textual.widgets.config_dialog import ConfigDialog, ConfigValues
 from app.ui.textual.widgets.config_provider import ConfigProvider
@@ -56,6 +57,55 @@ class AppConfigDialog(ConfigDialog):
             provider.save_config(values)
 
     # ------------------------------------------------------------------
+    # Page reload
+    # ------------------------------------------------------------------
+
+    async def _reload_pages(self) -> None:
+        """Re-fetch pages and values from providers and rebuild the dialog.
+
+        Called after *Apply* so that pages whose schemas or values depend
+        on the just-saved configuration are refreshed (e.g. topic selection
+        lists that depend on the global topic definitions).
+        """
+        current_id = self._current_page.id if self._current_page else None
+
+        # Clear form area first — await ensures old widgets are fully removed
+        # before new ones with the same IDs are mounted.
+        container = self.query_one("#config-form-area", VerticalScroll)
+        await container.remove_children()
+
+        # Re-collect pages and values from providers
+        self._pages = [p.config_page() for p in self._providers]
+        self._initial_values = {
+            page.id: provider.config_values()
+            for page, provider in zip(self._pages, self._providers)
+        }
+
+        # Rebuild internal indexes
+        self._page_index.clear()
+        self._parent_map.clear()
+        self._page_values.clear()
+        self._array_stores.clear()
+        self._index_pages(self._pages, None)
+        self._load_initial_values()
+
+        # Rebuild tree
+        tree = self.query_one("#config-tree", Tree)
+        tree.clear()
+        self._build_tree()
+
+        # Re-render current page (or first page if no longer exists)
+        if current_id and current_id in self._page_index:
+            self._current_page = self._page_index[current_id]
+        elif self._pages:
+            self._current_page = self._pages[0]
+        else:
+            self._current_page = None
+
+        if self._current_page:
+            self._render_page_form(self._current_page)
+
+    # ------------------------------------------------------------------
     # Override apply / accept to notify providers
     # ------------------------------------------------------------------
 
@@ -70,6 +120,7 @@ class AppConfigDialog(ConfigDialog):
         values = self._collect_all_values()
         self._notify_providers(values)
         self.post_message(self.Applied(values))
+        self.run_worker(self._reload_pages())
 
     def _accept(self) -> None:
         errors = self._validate_all()

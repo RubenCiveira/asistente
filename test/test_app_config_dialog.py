@@ -34,6 +34,33 @@ class StubProvider(ConfigProvider):
         self.saved.append(values)
 
 
+class CountingProvider(ConfigProvider):
+    """Provider that counts config_page / config_values calls."""
+
+    def __init__(self):
+        self.page_call_count = 0
+        self.values_call_count = 0
+        self.saved: List[Dict[str, ConfigValues]] = []
+
+    def config_page(self) -> ConfigPage:
+        self.page_call_count += 1
+        return ConfigPage(
+            id="counter",
+            title="Counter",
+            schema={
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+            },
+        )
+
+    def config_values(self) -> ConfigValues:
+        self.values_call_count += 1
+        return ConfigValues(values={"name": "test"})
+
+    def save_config(self, values: Dict[str, ConfigValues]) -> None:
+        self.saved.append(values)
+
+
 # ── Helper apps ──────────────────────────────────────────────────────
 
 
@@ -197,3 +224,25 @@ class TestAppConfigDialog:
         assert len(p1.saved) == 1
         assert len(p2.saved) == 1
         assert len(p3.saved) == 1
+
+    @pytest.mark.asyncio
+    async def test_apply_reloads_pages(self):
+        """Apply triggers page and value reload from providers."""
+        p = CountingProvider()
+        app = ApplyProviderApp([p])
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # config_page called during __init__ (twice: pages + initial keys)
+            # config_values called during __init__
+            count_before = p.page_call_count
+            values_before = p.values_call_count
+
+            await pilot.click("#apply")
+            await pilot.pause()
+
+            # After apply, config_page and config_values should be called again
+            assert p.page_call_count > count_before
+            assert p.values_call_count > values_before
+
+            await pilot.click("#cancel")
+            await pilot.pause()

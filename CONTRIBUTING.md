@@ -18,9 +18,9 @@ source .venv/bin/activate
 make test           # pytest with verbose output
 ```
 
-All new code should include tests. Place them under `tests/` and mirror the
-source layout (e.g. tests for `app/ui/textual/form.py` go in
-`tests/test_textual_form.py`).
+All new code should include tests. Place them under `test/` and mirror the
+source layout (e.g. tests for `src/app/ui/textual/form.py` go in
+`test/test_textual_form.py`).
 
 ## Code style
 
@@ -59,18 +59,20 @@ Open an issue on GitHub describing:
 - Steps to reproduce (ideally a minimal example).
 - Python version and OS.
 
-## Adding a new agent
+## Adding a new agent (legacy — `src/old/`)
 
-1. Create a new file under `app/agents/`.
+> The agent system lives in `src/old/` and is not part of the active codebase.
+
+1. Create a new file under `src/old/agents/`.
 2. Subclass `BaseAgent` and implement at least the `plan()` method.
 3. Set the class-level `agent_type` attribute.
 4. The runtime auto-discovers agents — no manual registration is needed.
-5. Add prompts under `app/agents/i18n/<agent_name>.prompts.<lang>.json`.
+5. Add prompts under `src/old/agents/i18n/<agent_name>.prompts.<lang>.json`.
 
-## Adding a new tool
+## Adding a new tool (legacy — `src/old/`)
 
 1. Create a function with signature `(params: dict, ctx: ToolContext) -> Any`.
-2. Register it in `main.py` / `agent.py` via `runtime.register_tool("name", fn)`.
+2. Register it via `runtime.register_tool("name", fn)`.
 
 ## License
 

@@ -22,6 +22,9 @@ JSON-Schema-driven forms and filesystem browsing with autocomplete.
 - **Path dialog with autocomplete** — browse the filesystem inside a modal
   with type-ahead suggestions, filtering and validation constraints.
 - **Confirmation dialogs** — reusable yes/no modal for destructive actions.
+- **Configuration dialog** — generic hierarchical settings dialog with a
+  page tree and JSON-Schema-driven forms, supporting Apply and Accept
+  actions.
 
 ## Requirements
 

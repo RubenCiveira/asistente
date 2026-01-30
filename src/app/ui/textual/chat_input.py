@@ -31,13 +31,10 @@ class ChatInput(Widget):
         border: round $accent;
         padding: 0 1;
     }
-    
-    AutoComplete {
-        margin-top: -6;
-    }
     """
 
     value: reactive[str] = reactive("")
+    CONTINUE_WRITE_VALID_CHARS = ("/", ":", "#", "@", ".")
 
     def __init__(
         self,
@@ -59,13 +56,14 @@ class ChatInput(Widget):
             placeholder=self.placeholder,
             id="chat_input",
         )
-
-        yield self._input
-        yield TokenAwareAutoComplete(
+        self._autocomplete = TokenAwareAutoComplete(
             target=self._input,
             candidates=self._candidates,
             resolvers=self.triggers,
         )
+
+        yield self._input
+        yield self._autocomplete
 
     def on_mount(self) -> None:
         self._input.focus()
@@ -79,34 +77,31 @@ class ChatInput(Widget):
         cursor = state.cursor_position
         before = text[:cursor]
 
-        trigger_pos = -1
-        trigger_char = None
-
-        for t in self.triggers.keys():
-            pos = before.rfind(t)
-            if pos > trigger_pos:
-                trigger_pos = pos
-                trigger_char = t
+        trigger_pos, trigger_len, trigger_char = (
+            self._autocomplete._find_last_trigger(before)
+        )
 
         if trigger_pos == -1 or trigger_char is None:
             return []
 
-        config = self.triggers[trigger_char]
-        prefix = before[trigger_pos + 1 :]
+        provider = self.triggers[trigger_char]
 
-        raw_items = config(prefix)
-        items: List[DropdownItem] = []
+        # token entre trigger y cursor
+        prefix = before[trigger_pos + trigger_len :]
 
-        for item in raw_items:
-            items.append(
-                DropdownItem(
-                    main=item.main + " ",
-                    prefix=item.prefix,
-                )
+        # si hay espacios, no autocomplete
+        if any(ch.isspace() for ch in prefix):
+            return []
+
+        raw_items = provider(prefix)
+
+        return [
+            DropdownItem(
+                main=item.main + ("" if str(item.main).endswith( self.CONTINUE_WRITE_VALID_CHARS ) else " "),
+                prefix=item.prefix,
             )
-
-        # marcar para mover cursor al final tras insertar
-        return items
+            for item in raw_items
+        ]
 
     # ─────────────────────────────────────
     # Submit / Events

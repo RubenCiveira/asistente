@@ -14,7 +14,8 @@ class ContextProvider:
             "agent:planner",
             "agent:executor",
         ]
-
+        if prefix.startswith("src/"):
+            items = items + [ prefix + "golo/" ]
         return [
             DropdownItem(
                 main=f"{item}",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Mapping, Any, Iterable
+from textual.geometry import Offset, Region, Spacing
 
 from textual_autocomplete import AutoComplete
 from textual_autocomplete.fuzzy_search import FuzzySearch
@@ -15,6 +16,12 @@ class TokenFuzzySearch(FuzzySearch):
 
 class TokenAwareAutoComplete(AutoComplete):
     """AutoComplete que filtra usando solo el token activo (tras el último trigger)."""
+
+    # ITEM_HEIGHT = 1
+    # BORDER = 2
+    # PADDING = 1
+
+    VALID_TRIGGER_PREFIXES = {" ", "\t", "\n", "(", "[", "{", "<"}
 
     def __init__(self, *args, resolvers: Mapping[str, Any], **kwargs):
         """
@@ -34,7 +41,7 @@ class TokenAwareAutoComplete(AutoComplete):
         before = text[:cursor]
         after = text[cursor:]
 
-        trigger_pos, trigger_len = self._find_last_trigger(before)
+        trigger_pos, trigger_len, trigger_char = self._find_last_trigger(before)
         if trigger_pos == -1:
             return
 
@@ -66,25 +73,64 @@ class TokenAwareAutoComplete(AutoComplete):
         new_cursor = trigger_pos + trigger_len + len(replacement_token) + len(suffix)
         input_widget.cursor_position = new_cursor
 
-        # cierra el dropdown
-        # self.dismiss()
+    def _align_to_target(self) -> None:
+        x, y = self.target.cursor_screen_offset
+        dropdown = self.option_list
+
+        # espacio disponible hacia arriba
+        available_above = y - self.screen.scrollable_content_region.y
+
+        # número máximo de filas que caben
+        max_rows = max(1, available_above)
+
+        # permitir crecer hasta ahí
+        dropdown.styles.max_height = max_rows
+
+        width, height = dropdown.outer_size
+
+        region = Region(
+            x - 1,
+            y - height,
+            width,
+            height,
+        )
+
+        x, y, _, _ = region.constrain(
+            "inside",
+            "none",
+            Spacing.all(0),
+            self.screen.scrollable_content_region,
+        )
+
+        self.absolute_offset = Offset(x, y)
 
     # ──────────────────────────────
     # helpers
     # ──────────────────────────────
 
-    def _find_last_trigger(self, before: str) -> tuple[int, int]:
-        trigger_pos = -1
-        trigger_len = 0
-
-        for t in self._triggers:
-            pos = before.rfind(t)
-            if pos > trigger_pos:
-                trigger_pos = pos
-                trigger_len = len(t)
-
-        return trigger_pos, trigger_len
-
     def _suffix_for(self, trigger: str) -> str:
         cfg = self._resolvers.get(trigger)
         return getattr(cfg, "suffix", "")
+
+    def _find_last_trigger(self, before: str) -> tuple[int, int, str | None]:
+        trigger_pos = -1
+        trigger_len = 0
+        trigger_char = None
+
+        for t in self._triggers:
+            pos = before.rfind(t)
+            if pos == -1:
+                continue
+
+            # validar contexto previo
+            if pos > 0:
+                prev = before[pos - 1]
+                if not (prev.isspace() or prev in self.VALID_TRIGGER_PREFIXES):
+                    continue
+
+            if pos > trigger_pos:
+                trigger_pos = pos
+                trigger_len = len(t)
+                trigger_char = t
+
+        return trigger_pos, trigger_len, trigger_char

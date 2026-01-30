@@ -385,13 +385,13 @@ class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
         elif bid == "accept":
             self._accept()
         elif bid.endswith("--add"):
-            self._handle_array_add(bid)
+            self.run_worker(self._handle_array_add(bid))
 
-    def _handle_array_add(self, button_id: str) -> None:
+    async def _handle_array_add(self, button_id: str) -> None:
         """Add item to a free-text array field."""
         if self._form is None:
             return
-        error = self._form.handle_array_add(button_id)
+        error = await self._form.handle_array_add(button_id)
         if error:
             self.query_one("#config-errors", Static).update(error)
             return

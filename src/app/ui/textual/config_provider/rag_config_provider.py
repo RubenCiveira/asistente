@@ -90,9 +90,22 @@ class RagConfigProvider(ConfigProvider):
                         "properties": {
                             "entries": {
                                 "type": "array",
-                                "items": {"type": "string"},
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                            "description": "Name",
+                                        },
+                                        "path": {
+                                            "type": "string",
+                                            "description": "Path",
+                                        },
+                                    },
+                                    "required": ["name", "path"],
+                                },
                                 "uniqueItems": True,
-                                "description": "Topics (name:path)",
+                                "description": "Topics",
                             },
                         },
                     },
@@ -136,7 +149,9 @@ class RagConfigProvider(ConfigProvider):
             childs={
                 "topics": ConfigValues(
                     values={
-                        "entries": [f"{t.name}:{t.path}" for t in topics],
+                        "entries": [
+                            {"name": t.name, "path": t.path} for t in topics
+                        ],
                     },
                     childs={
                         "workspace_topics": ConfigValues(
@@ -172,9 +187,8 @@ class RagConfigProvider(ConfigProvider):
             entries = topics_cv.values.get("entries", [])
             new_topics: List[Topic] = []
             for entry in entries:
-                parts = entry.split(":", 1)
-                name = parts[0].strip()
-                path = parts[1].strip() if len(parts) > 1 else ""
+                name = str(entry.get("name", "")).strip()
+                path = str(entry.get("path", "")).strip()
                 if name:
                     new_topics.append(Topic(name=name, path=path))
             self.window.config.topics = new_topics

@@ -62,6 +62,7 @@ class FieldRender:
         id_prefix: Optional[str] = None,
         label_class: Optional[str] = None,
         include_input_label: bool = True,
+        object_array_mode: str = "input",
         selection_list_id: Optional[str] = None,
         array_list_id: Optional[str] = None,
         array_input_id: Optional[str] = None,
@@ -74,6 +75,7 @@ class FieldRender:
         self._id_prefix = id_prefix
         self._label_class = label_class
         self._include_input_label = include_input_label
+        self._object_array_mode = object_array_mode
         self._selection_list_id = selection_list_id
         self._array_list_id = array_list_id
         self._array_input_id = array_input_id
@@ -164,16 +166,29 @@ class FieldRender:
             array_values = list(value or [])
             lv_id = self._array_list_id or widget_id
             lv = ListView(
-                *[ListItem(Label(str(v))) for v in array_values],
+                *[
+                    ListItem(Label(self.format_array_item(items_spec, v)))
+                    for v in array_values
+                ],
                 id=lv_id,
                 classes=self._array_items_class,
             )
-            input_id = self._array_input_id
-            if input_id is None and widget_id:
-                input_id = f"{widget_id}--input"
             add_id = self._array_add_id
             if add_id is None and widget_id:
                 add_id = f"{widget_id}--add"
+            if self._is_object_array(items_spec) and self._object_array_mode == "button_only":
+                add_button = Button("Add", id=add_id)
+                row = Horizontal(
+                    add_button,
+                    id=self._array_row_id,
+                    classes=self._array_row_class,
+                )
+                self._container.mount(self._label_widget(label), lv, row)
+                return add_button, array_values
+
+            input_id = self._array_input_id
+            if input_id is None and widget_id:
+                input_id = f"{widget_id}--input"
             input_widget = Input(
                 placeholder="Add item and press Enter",
                 id=input_id,
@@ -219,6 +234,22 @@ class FieldRender:
             return False
         items_spec = spec.get("items", {})
         return "oneOf" not in items_spec and "enum" not in items_spec
+
+    @staticmethod
+    def _is_object_array(items_spec: Dict[str, Any]) -> bool:
+        return items_spec.get("type") == "object" or "properties" in items_spec
+
+    @staticmethod
+    def format_array_item(items_spec: Dict[str, Any], value: Any) -> str:
+        if FieldRender._is_object_array(items_spec) and isinstance(value, dict):
+            props = items_spec.get("properties", {})
+            parts = []
+            for key in props.keys():
+                val = value.get(key, "")
+                parts.append(f"{key}: {val}")
+            if parts:
+                return " | ".join(parts)
+        return str(value)
 
     @staticmethod
     def handle_array_key(event, lv: ListView, inp: Input, values: List[Any]) -> bool:
@@ -353,6 +384,7 @@ class SchemaForm(Vertical):
             id_prefix=self._id_prefix,
             label_class="config-field-label",
             include_input_label=True,
+            object_array_mode="button_only",
             array_items_class="config-array-items",
             array_row_class="config-array-row",
         )
@@ -372,19 +404,11 @@ class SchemaForm(Vertical):
                 values[name] = val
         return values
 
-    def handle_array_add(self, button_id: str) -> Optional[str]:
+    async def handle_array_add(self, button_id: str) -> Optional[str]:
+        inp: Optional[Input] = None
+        value: Any
         base_id = button_id.removesuffix("--add")
         input_id = f"{base_id}--input"
-        try:
-            inp = self.query_one(f"#{input_id}", Input)
-            lv = self.query_one(f"#{base_id}", ListView)
-        except Exception:
-            return None
-
-        raw = inp.value.strip()
-        if not raw:
-            return None
-
         prefix = f"{self._id_prefix}-"
         if not base_id.startswith(prefix):
             return None
@@ -392,12 +416,34 @@ class SchemaForm(Vertical):
 
         spec = self._properties.get(field_name, {})
         items_spec = spec.get("items", {})
-        item_type = items_spec.get("type", "string")
+        if FieldRender._is_object_array(items_spec):
+            item_schema = dict(items_spec)
+            item_schema.setdefault("type", "object")
+            result = await self.app.push_screen_wait(FormDialog(item_schema))
+            if result is None:
+                return None
+            value = result
+        else:
+            try:
+                inp = self.query_one(f"#{input_id}", Input)
+            except Exception:
+                return None
+
+            raw = inp.value.strip()
+            if not raw:
+                return None
+
+            item_type = items_spec.get("type", "string")
+
+            try:
+                value = self._cast_value(raw, item_type)
+            except ValueError as e:
+                return str(e)
 
         try:
-            value = self._cast_value(raw, item_type)
-        except ValueError as e:
-            return str(e)
+            lv = self.query_one(f"#{base_id}", ListView)
+        except Exception:
+            return None
 
         v = Draft202012Validator(items_spec)
         item_errors = [e.message for e in v.iter_errors(value)]
@@ -409,9 +455,11 @@ class SchemaForm(Vertical):
             return "Duplicate value not allowed"
 
         arr.append(value)
-        inp.value = ""
-        lv.append(ListItem(Label(str(value))))
-        inp.focus()
+        if not FieldRender._is_object_array(items_spec):
+            if inp is not None:
+                inp.value = ""
+                inp.focus()
+        lv.append(ListItem(Label(FieldRender.format_array_item(items_spec, value))))
         return None
 
     def _read_field_value(self, name: str, spec: Dict[str, Any]) -> Any:

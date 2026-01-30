@@ -31,6 +31,7 @@ from app.ui.textual.widgets.confirm import Confirm
 from app.ui.textual.widgets.chat_input import ChatInput
 from app.ui.textual.action.select_project import SelectProject
 from app.ui.textual.action.select_workspace import SelectWorkspace
+from app.ui.textual.action.test.test_config import TestConfig
 from app.ui.textual.completion_provider.slash_provider import SlashCommandProvider
 from app.ui.textual.completion_provider.at_provider import ContextProvider
 from app.ui.textual.completion_provider.colon_provider import PowerCommandProvider
@@ -68,6 +69,7 @@ class MainApp(App):
         ("ctrl+n", "new_session", "New tab"),
         ("ctrl+d", "close_session", "Close tab"),
         ("ctrl+k", "clear_text", "Clear text"),
+        ("ctrl+t", "test_config", "Test config"),
         ("ctrl+q", "quit", "Quit"),
     ]
 
@@ -90,6 +92,7 @@ class MainApp(App):
 
         self._select_project_action = SelectProject(self)
         self._select_workspace_action = SelectWorkspace(self, self._select_project_action)
+        self._test_config_action = TestConfig(self)
 
     def get_active_workspace(self):
         """Return the workspace of the active session (may be ``None``)."""
@@ -249,6 +252,10 @@ class MainApp(App):
     def action_select_workspace(self) -> None:
         """Keybinding action: launch the workspace-selection flow."""
         self.run_worker(self._select_workspace_action.run())
+
+    def action_test_config(self) -> None:
+        """Keybinding action: launch the configuration dialog smoke test."""
+        self.run_worker(self._test_config_action.run())
 
     def action_new_session(self) -> None:
         """Keybinding action: create a new empty session tab."""

@@ -473,6 +473,68 @@ Return the suffix to append after a completion for the given trigger.
 
 ---
 
+## `app.ui.textual.widgets.config_dialog`
+
+Generic hierarchical configuration dialog with a page tree and dynamic
+JSON-Schema-driven forms.
+
+### `class ConfigPage`
+
+Dataclass defining a single page in the configuration hierarchy.
+
+| Attribute  | Type                          | Description                     |
+|------------|-------------------------------|---------------------------------|
+| `id`       | `str`                         | Unique page identifier          |
+| `title`    | `str`                         | Human-readable title for tree   |
+| `schema`   | `Dict[str, Any]`              | JSON Schema (Draft 2020-12)     |
+| `children` | `Optional[List[ConfigPage]]`  | Child pages forming a sub-tree  |
+
+### `class ConfigValues`
+
+Per-page values container.
+
+| Attribute | Type                       | Description                         |
+|-----------|----------------------------|-------------------------------------|
+| `values`  | `Dict[str, Any]`           | Field name to value mapping         |
+| `childs`  | `Dict[str, ConfigValues]`  | Child page id to ConfigValues       |
+
+### `class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]])`
+
+Modal configuration dialog with a page tree on the right and a scrollable
+form area on the left.
+
+| Parameter        | Type                               | Default             |
+|------------------|------------------------------------|---------------------|
+| `pages`          | `List[ConfigPage]`                 | required            |
+| `initial_values` | `Optional[Dict[str, ConfigValues]]`| `None`              |
+| `title`          | `str`                              | `"Configuration"`   |
+
+**Returns:** `Dict[str, ConfigValues]` on accept, `None` on cancel.
+
+**Bindings:** `Escape` -> cancel
+
+#### Key methods
+
+- `compose() -> ComposeResult` -- Build the widget tree.
+- `on_mount()` -- Build tree and render the first page.
+- `on_tree_node_selected(event)` -- Switch form to the selected page.
+- `action_cancel()` -- Dismiss with `None`.
+- `_apply()` -- Validate and post `Applied` message.
+- `_accept()` -- Validate and dismiss with values.
+- `_render_page_form(page)` -- Render all fields for a page.
+- `_validate_all()` -- Validate every page against its schema.
+- `_collect_all_values()` -- Reconstruct hierarchical values dict.
+
+### `class ConfigDialog.Applied(Message)`
+
+Message posted when the user clicks *Apply*.
+
+| Attribute | Type                       | Description             |
+|-----------|----------------------------|-------------------------|
+| `values`  | `Dict[str, ConfigValues]`  | Current configuration   |
+
+---
+
 ## `app.ui.textual.completion_provider.slash_provider`
 
 Completion provider for `/` commands.

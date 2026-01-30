@@ -24,6 +24,7 @@ graph TD
         Confirm["Confirm (widgets/confirm.py)"]
         FormDialog["FormDialog (widgets/form.py)"]
         PathDialog["PathDialog (widgets/path_dialog.py)"]
+        ConfigDialog["ConfigDialog (widgets/config_dialog.py)"]
         ConsoleFormRenderer["ConsoleFormRenderer (console/form.py)"]
     end
 
@@ -175,6 +176,25 @@ classDiagram
         +action_cancel()
     }
 
+    class ConfigDialog {
+        +pages: list~ConfigPage~
+        +title: str
+        +compose() ComposeResult
+        +action_cancel()
+    }
+
+    class ConfigPage {
+        +id: str
+        +title: str
+        +schema: dict
+        +children: list~ConfigPage~
+    }
+
+    class ConfigValues {
+        +values: dict
+        +childs: dict~ConfigValues~
+    }
+
     class ConsoleFormRenderer {
         +schema: dict
         +field_order: list
@@ -257,6 +277,9 @@ classDiagram
     Confirm --|> ModalScreen~bool~
     FormDialog --|> ModalScreen~dict~
     PathDialog --|> ModalScreen~Path~
+    ConfigDialog --|> ModalScreen~dict~
+    ConfigDialog "1" --> "*" ConfigPage : renders
+    ConfigDialog "1" --> "*" ConfigValues : manages
 ```
 
 ---

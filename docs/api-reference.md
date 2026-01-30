@@ -173,7 +173,7 @@ Duplicates are removed and the list is capped at 10 entries.
 
 ---
 
-## `app.ui.textual.confirm`
+## `app.ui.textual.widgets.confirm`
 
 Simple yes/no confirmation modal for Textual applications.
 
@@ -204,7 +204,7 @@ Handle the Escape key by dismissing with `False`.
 
 ---
 
-## `app.ui.textual.form`
+## `app.ui.textual.widgets.form`
 
 Textual modal form dialog driven by JSON Schema (Draft 2020-12).
 
@@ -237,7 +237,7 @@ validation.
 
 ---
 
-## `app.ui.textual.path_dialog`
+## `app.ui.textual.widgets.path_dialog`
 
 File and directory browser modal with autocomplete suggestions.
 
@@ -390,7 +390,7 @@ Open a `PathDialog` for the user to pick a new workspace directory.
 
 ---
 
-## `app.ui.textual.chat_input`
+## `app.ui.textual.widgets.chat_input`
 
 Chat input widget with trigger-based autocomplete.
 
@@ -440,7 +440,7 @@ Message posted when the user submits text via Enter.
 
 ---
 
-## `app.ui.textual.token_aware_auto_complete`
+## `app.ui.textual.widgets.token_aware_auto_complete`
 
 Token-aware autocomplete overlay for Textual inputs.
 

@@ -1,4 +1,4 @@
-"""Tests for app.ui.textual.confirm.Confirm."""
+"""Tests for app.ui.textual.widgets.confirm.Confirm."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Button
 
-from app.ui.textual.confirm import Confirm
+from app.ui.textual.widgets.confirm import Confirm
 
 
 class ConfirmApp(App):

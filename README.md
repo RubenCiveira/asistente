@@ -69,11 +69,12 @@ asistente/
 │           ├── console/
 │           │   └── form.py                # Console JSON-Schema form renderer
 │           └── textual/
-│               ├── chat_input.py          # Chat input with trigger-based autocomplete
-│               ├── confirm.py             # Yes/no modal dialog
-│               ├── form.py                # Wizard-style JSON-Schema form dialog
-│               ├── path_dialog.py         # File/directory browser with autocomplete
-│               ├── token_aware_auto_complete.py  # Token-aware autocomplete overlay
+│               ├── widgets/
+│               │   ├── chat_input.py      # Chat input with trigger-based autocomplete
+│               │   ├── confirm.py         # Yes/no modal dialog
+│               │   ├── form.py            # Wizard-style JSON-Schema form dialog
+│               │   ├── path_dialog.py     # File/directory browser with autocomplete
+│               │   └── token_aware_auto_complete.py  # Token-aware autocomplete overlay
 │               ├── action/
 │               │   ├── select_project.py  # Action: pick or create a project
 │               │   └── select_workspace.py # Action: pick or create a workspace

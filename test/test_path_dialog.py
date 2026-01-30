@@ -1,4 +1,4 @@
-"""Tests for app.ui.textual.path_dialog.PathDialog."""
+"""Tests for app.ui.textual.widgets.path_dialog.PathDialog."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.widgets import Button, Input
 
-from app.ui.textual.path_dialog import PathDialog
+from app.ui.textual.widgets.path_dialog import PathDialog
 
 
 class PathApp(App):

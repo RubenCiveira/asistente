@@ -19,11 +19,11 @@ coordination logic (actions), domain models, and persistence concerns.
 graph TD
     subgraph Presentation
         MainApp["MainApp (window.py)"]
-        ChatInput["ChatInput (chat_input.py)"]
-        TokenAwareAC["TokenAwareAutoComplete"]
-        Confirm["Confirm (confirm.py)"]
-        FormDialog["FormDialog (form.py)"]
-        PathDialog["PathDialog (path_dialog.py)"]
+        ChatInput["ChatInput (widgets/chat_input.py)"]
+        TokenAwareAC["TokenAwareAutoComplete (widgets/)"]
+        Confirm["Confirm (widgets/confirm.py)"]
+        FormDialog["FormDialog (widgets/form.py)"]
+        PathDialog["PathDialog (widgets/path_dialog.py)"]
         ConsoleFormRenderer["ConsoleFormRenderer (console/form.py)"]
     end
 

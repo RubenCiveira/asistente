@@ -7,7 +7,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Button
 
 from app.context.keywords import Keywords
-from app.ui.textual.chat_input import ChatInput
+from app.ui.textual.widgets.chat_input import ChatInput
 from app.ui.textual.completion_provider.slash_provider import SlashCommandProvider
 from app.ui.textual.completion_provider.hash_provider import SemanticProvider
 

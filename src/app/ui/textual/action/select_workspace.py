@@ -13,8 +13,8 @@ from textual.widgets import Markdown
 
 from pathlib import Path
 
-from app.ui.textual.path_dialog import PathDialog
-from app.ui.textual.form import FormDialog
+from app.ui.textual.widgets.path_dialog import PathDialog
+from app.ui.textual.widgets.form import FormDialog
 from app.config import AppConfig, default_workspaces_dir
 from app.context.workspace import Workspace
 

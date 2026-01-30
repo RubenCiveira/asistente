@@ -1,7 +1,7 @@
 """Chat input widget with trigger-based autocomplete.
 
 Wraps a Textual :class:`~textual.widgets.Input` with a
-:class:`~app.ui.textual.token_aware_auto_complete.TokenAwareAutoComplete`
+:class:`~app.ui.textual.widgets.token_aware_auto_complete.TokenAwareAutoComplete`
 overlay.  Each trigger character (``/``, ``@``, ``:``, ``#``, etc.) is
 mapped to a :data:`CompletionProvider` callable that returns matching
 :class:`~textual_autocomplete.DropdownItem` suggestions.
@@ -20,7 +20,7 @@ from textual.message import Message
 
 from textual_autocomplete import AutoComplete, DropdownItem
 from textual_autocomplete._autocomplete import TargetState
-from app.ui.textual.token_aware_auto_complete import TokenAwareAutoComplete
+from app.ui.textual.widgets.token_aware_auto_complete import TokenAwareAutoComplete
 
 from app.context.keywords import Keywords
 

@@ -6,7 +6,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Button, Input, ListView, Static
 
-from app.ui.textual.form import FormDialog
+from app.ui.textual.widgets.form import FormDialog
 
 
 # ----------------------------------------------------------------

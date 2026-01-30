@@ -27,8 +27,8 @@ from app.context.project import Project
 from app.context.session import Session
 from app.context.keywords import Keywords
 
-from app.ui.textual.confirm import Confirm
-from app.ui.textual.chat_input import ChatInput
+from app.ui.textual.widgets.confirm import Confirm
+from app.ui.textual.widgets.chat_input import ChatInput
 from app.ui.textual.action.select_project import SelectProject
 from app.ui.textual.action.select_workspace import SelectWorkspace
 from app.ui.textual.completion_provider.slash_provider import SlashCommandProvider

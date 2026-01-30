@@ -1,7 +1,7 @@
 """TUI action for selecting or creating a project within the active workspace.
 
 Presents the user with a list of known projects (if any) or jumps straight
-to the new-project flow via :class:`~app.ui.textual.path_dialog.PathDialog`.
+to the new-project flow via :class:`~app.ui.textual.widgets.path_dialog.PathDialog`.
 """
 
 from __future__ import annotations
@@ -11,9 +11,9 @@ from textual.widgets import Markdown
 
 from pathlib import Path
 
-from app.ui.textual.path_dialog import PathDialog
-from app.ui.textual.form import FormDialog
-from app.ui.textual.confirm import Confirm
+from app.ui.textual.widgets.path_dialog import PathDialog
+from app.ui.textual.widgets.form import FormDialog
+from app.ui.textual.widgets.confirm import Confirm
 from app.context.project import Project
 
 _NEW_PROJECT = "__new__"

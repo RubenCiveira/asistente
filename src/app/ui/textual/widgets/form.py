@@ -174,14 +174,18 @@ class FieldRender:
             add_id = self._array_add_id
             if add_id is None and widget_id:
                 add_id = f"{widget_id}--add"
+            input_widget = Input(
+                placeholder="Add item and press Enter",
+                id=input_id,
+            )
             row = Horizontal(
-                Input(placeholder="Add item and press Enter", id=input_id),
+                input_widget,
                 Button("Add", id=add_id),
                 id=self._array_row_id,
                 classes=self._array_row_class,
             )
             self._container.mount(self._label_widget(label), lv, row)
-            return row.query_one(Input), array_values
+            return input_widget, array_values
 
         inp = Input(placeholder=label, id=widget_id)
         if value is not None:

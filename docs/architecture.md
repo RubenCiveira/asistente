@@ -19,10 +19,19 @@ coordination logic (actions), domain models, and persistence concerns.
 graph TD
     subgraph Presentation
         MainApp["MainApp (window.py)"]
+        ChatInput["ChatInput (chat_input.py)"]
+        TokenAwareAC["TokenAwareAutoComplete"]
         Confirm["Confirm (confirm.py)"]
         FormDialog["FormDialog (form.py)"]
         PathDialog["PathDialog (path_dialog.py)"]
         ConsoleFormRenderer["ConsoleFormRenderer (console/form.py)"]
+    end
+
+    subgraph Completion Providers
+        SlashProvider["SlashCommandProvider (/)"]
+        AtProvider["ContextProvider (@)"]
+        ColonProvider["PowerCommandProvider (:)"]
+        HashProvider["SemanticProvider (#)"]
     end
 
     subgraph Actions
@@ -35,6 +44,7 @@ graph TD
         Session["Session"]
         Workspace["Workspace"]
         Project["Project"]
+        Keywords["Keywords"]
     end
 
     subgraph Persistence
@@ -42,6 +52,15 @@ graph TD
         WorkspaceJSON["&lt;workspace&gt;/workspace.json"]
         ProjectJSON["&lt;project&gt;/.conf/assistants/project.json"]
     end
+
+    MainApp --> ChatInput
+    ChatInput --> TokenAwareAC
+    ChatInput --> Keywords
+    TokenAwareAC --> Keywords
+    ChatInput --> SlashProvider
+    ChatInput --> AtProvider
+    ChatInput --> ColonProvider
+    ChatInput --> HashProvider
 
     MainApp --> SelectWorkspace
     MainApp --> SelectProject
@@ -177,6 +196,43 @@ classDiagram
         +new_project() Project
     }
 
+    class Keywords {
+        +CONTINUE_WRITE_VALID_CHARS: tuple
+        +VALID_TRIGGER_PREFIXES: set
+        +must_continue(txt) bool
+        +find_last_trigger(before) tuple
+    }
+
+    class ChatInput {
+        +triggers: dict
+        +keywords: Keywords
+        +value: reactive~str~
+        +compose()
+        +_candidates(state) list
+    }
+
+    class TokenAwareAutoComplete {
+        +apply_completion(item, state)
+        +_align_to_target()
+        +_suffix_for(trigger) str
+    }
+
+    class SlashCommandProvider {
+        +__call__(prefix) list
+    }
+
+    class ContextProvider {
+        +__call__(prefix) list
+    }
+
+    class PowerCommandProvider {
+        +__call__(prefix) list
+    }
+
+    class SemanticProvider {
+        +__call__(prefix) list
+    }
+
     MainApp "1" --> "1" AppConfig : reads/writes
     MainApp "1" --> "*" Session : manages
     Session "1" --> "0..1" Workspace
@@ -190,6 +246,14 @@ classDiagram
     SelectProject ..> FormDialog : opens
     SelectProject ..> PathDialog : opens
     SelectProject ..> Confirm : opens
+    MainApp "1" --> "1" ChatInput : embeds
+    ChatInput "1" --> "1" TokenAwareAutoComplete : creates
+    ChatInput "1" --> "1" Keywords : uses
+    ChatInput "1" --> "*" SlashCommandProvider : trigger /
+    ChatInput "1" --> "*" ContextProvider : trigger @
+    ChatInput "1" --> "*" PowerCommandProvider : trigger :
+    ChatInput "1" --> "*" SemanticProvider : trigger #
+    TokenAwareAutoComplete --|> AutoComplete
     Confirm --|> ModalScreen~bool~
     FormDialog --|> ModalScreen~dict~
     PathDialog --|> ModalScreen~Path~
@@ -319,3 +383,6 @@ database is required.
 | **Workspace to Project chaining** | Selecting a workspace automatically chains into project selection, reducing the number of manual steps for the user. |
 | **Recent workspaces cap (10)** | Prevents the list from growing unbounded while still providing quick access to frequently used workspaces. |
 | **Separation of console and textual renderers** | Allows the form logic to be reused in non-TUI contexts (scripts, CI pipelines) via `ConsoleFormRenderer` backed by `prompt_toolkit`. |
+| **Trigger-based autocomplete** | Each trigger character (`/`, `@`, `:`, `#`) is mapped to an independent provider, making it trivial to add new completion sources without modifying the input widget. |
+| **Token-aware completion insertion** | `TokenAwareAutoComplete` replaces only the token between the trigger and the cursor, preserving surrounding text and enabling mid-line completions. |
+| **Keywords helper** | Extracting trigger detection into a standalone `Keywords` class decouples the logic from both the input widget and the autocomplete overlay, facilitating unit testing. |

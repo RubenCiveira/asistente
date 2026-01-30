@@ -13,6 +13,9 @@ JSON-Schema-driven forms and filesystem browsing with autocomplete.
   its own workspace and project.  Sessions are persisted across restarts.
 - **Workspace / project model** — organise work into workspaces (directories
   that group projects) and projects (directories with their own config).
+- **Trigger-based autocomplete** — chat input with multi-trigger completion
+  (`/` commands, `@` context references, `:` power-user commands, `#`
+  semantic entities) powered by pluggable providers.
 - **JSON-Schema-driven forms** — both the console (`prompt_toolkit`) and the
   TUI (Textual) renderers build forms dynamically from JSON Schema (Draft
   2020-12) with incremental cross-field validation.
@@ -58,6 +61,7 @@ asistente/
 │   └── app/
 │       ├── config.py                      # Application config (JSON persistence)
 │       ├── context/
+│       │   ├── keywords.py               # Trigger/keyword utilities for autocomplete
 │       │   ├── project.py                 # Project metadata dataclass
 │       │   ├── session.py                 # Session (UUID, workspace, project refs)
 │       │   └── workspace.py               # Workspace manifest dataclass
@@ -65,17 +69,20 @@ asistente/
 │           ├── console/
 │           │   └── form.py                # Console JSON-Schema form renderer
 │           └── textual/
+│               ├── chat_input.py          # Chat input with trigger-based autocomplete
 │               ├── confirm.py             # Yes/no modal dialog
 │               ├── form.py                # Wizard-style JSON-Schema form dialog
 │               ├── path_dialog.py         # File/directory browser with autocomplete
-│               └── action/
-│                   ├── select_project.py   # Action: pick or create a project
-│                   ├── select_workspace.py # Action: pick or create a workspace
-│                   └── test/
-│                       ├── test_form.py    # Manual TUI smoke test for FormDialog
-│                       └── test_path.py    # Manual TUI smoke test for PathDialog
+│               ├── token_aware_auto_complete.py  # Token-aware autocomplete overlay
+│               ├── action/
+│               │   ├── select_project.py  # Action: pick or create a project
+│               │   └── select_workspace.py # Action: pick or create a workspace
+│               └── completion_provider/
+│                   ├── slash_provider.py   # "/" command completions
+│                   ├── at_provider.py      # "@" context reference completions
+│                   ├── colon_provider.py   # ":" power-user command completions
+│                   └── hash_provider.py    # "#" semantic entity completions
 ├── test/                                   # pytest test suite
-│   └── test_textual_form.py
 ├── docs/                                   # Technical and user documentation
 ├── Makefile
 ├── requirements.txt

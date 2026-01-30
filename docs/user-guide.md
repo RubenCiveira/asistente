@@ -42,6 +42,7 @@ sessions are restored and the last active tab is re-selected.
 | `Ctrl+Y`  | Open the project selector     |
 | `Ctrl+N`  | Create a new session tab      |
 | `Ctrl+D`  | Close the current session tab |
+| `Ctrl+K`  | Clear the active chat area    |
 | `Ctrl+Q`  | Quit the application          |
 
 ---
@@ -116,7 +117,33 @@ changes. On the next launch the sessions are restored exactly as they were.
 
 ---
 
-## 7. Form Dialogs
+## 7. Chat Input and Autocomplete
+
+The chat input at the bottom of the screen supports **trigger-based
+autocomplete**.  When you type one of the trigger characters, a dropdown
+appears with matching suggestions.
+
+### Trigger characters
+
+| Trigger | Purpose                          | Example items                    |
+|---------|----------------------------------|----------------------------------|
+| `/`     | System / agent commands          | `workspace`, `project`, `help`   |
+| `@`     | Context references (files, etc.) | `README.md`, `src/`, `agent:...` |
+| `:`     | Power-user / console commands    | `ws`, `proj`, `clear`, `quit`    |
+| `#`     | Semantic entities                | `User`, `Workspace`, `Project`   |
+
+### How it works
+
+1. Type a trigger character after a space or at the start of the line.
+2. A dropdown appears showing matching items.
+3. Continue typing to narrow results.
+4. Press **Tab** or click to accept a suggestion.
+5. If the completed text ends with `/`, `:`, `@`, `#` or `.`, the dropdown
+   stays open for chained input (e.g. `@src/` keeps suggesting paths).
+
+---
+
+## 8. Form Dialogs
 
 Several flows present a **wizard-style form dialog** powered by JSON Schema
 (Draft 2020-12).
@@ -146,7 +173,7 @@ Several flows present a **wizard-style form dialog** powered by JSON Schema
 
 ---
 
-## 8. Path Dialog
+## 9. Path Dialog
 
 The path dialog is used whenever you need to select a file or directory on the
 filesystem.
@@ -168,7 +195,7 @@ Press **Enter** or the **OK** button to confirm your selection. Press
 
 ---
 
-## 9. Configuration Files
+## 10. Configuration Files
 
 The application uses three JSON files for persistence. All are human-readable
 and can be edited manually if needed.

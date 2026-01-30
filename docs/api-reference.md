@@ -27,6 +27,37 @@ project.
 
 ---
 
+## `app.context.keywords`
+
+Trigger-based keyword utilities for autocomplete.
+
+### `class Keywords`
+
+Manages trigger characters used to activate autocomplete providers.
+
+| Parameter  | Type         | Description                            |
+|------------|--------------|----------------------------------------|
+| `triggers` | `list[str]`  | Ordered trigger strings (longest first)|
+
+**Class constants:**
+
+- `CONTINUE_WRITE_VALID_CHARS = ("/", ":", "#", "@", ".")` -- Characters
+  that keep the dropdown open.
+- `VALID_TRIGGER_PREFIXES = {" ", "\t", "\n", "(", "[", "{", "<"}` --
+  Valid characters before a trigger.
+
+#### `must_continue(txt) -> bool`
+
+Return `True` if *txt* ends with a character that should keep the
+autocomplete dropdown open.
+
+#### `find_last_trigger(before: str) -> tuple[int, int, str | None]`
+
+Find the rightmost valid trigger in *before*.  Returns
+`(position, length, trigger)` or `(-1, 0, None)` when no trigger is found.
+
+---
+
 ## `app.context.project`
 
 Project metadata backed by a JSON file at `.conf/assistants/project.json`.
@@ -359,6 +390,149 @@ Open a `PathDialog` for the user to pick a new workspace directory.
 
 ---
 
+## `app.ui.textual.chat_input`
+
+Chat input widget with trigger-based autocomplete.
+
+### `CompletionProvider`
+
+Type alias: `Callable[[str], List[DropdownItem]]`.  A function that
+receives a prefix string and returns matching dropdown items.
+
+### `class ChatInput(Widget)`
+
+Composite widget providing a text input with trigger-based autocomplete.
+
+| Parameter     | Type                            | Default              |
+|---------------|---------------------------------|----------------------|
+| `keywords`    | `Keywords`                      | required             |
+| `triggers`    | `Dict[str, CompletionProvider]` | required             |
+| `placeholder` | `str`                           | `"Escribe aquí..."`  |
+| `id`          | `Optional[str]`                 | `None`               |
+
+**Reactive attributes:**
+
+- `value: str` -- The last submitted text.
+
+#### `compose()`
+
+Build the widget tree: an `Input` and a `TokenAwareAutoComplete` overlay.
+
+#### `on_mount()`
+
+Focus the inner input.
+
+#### `_candidates(state) -> List[DropdownItem]`
+
+Return autocomplete suggestions for the current input state.
+
+#### `on_input_submitted(event)`
+
+Post a `Submitted` message and clear the input.
+
+### `class ChatInput.Submitted(Message)`
+
+Message posted when the user submits text via Enter.
+
+| Attribute | Type  | Description          |
+|-----------|-------|----------------------|
+| `value`   | `str` | The submitted text   |
+
+---
+
+## `app.ui.textual.token_aware_auto_complete`
+
+Token-aware autocomplete overlay for Textual inputs.
+
+### `class TokenFuzzySearch(FuzzySearch)`
+
+Fuzzy search that bypasses query filtering, returning a perfect score for
+every candidate so all provider results appear in the dropdown.
+
+### `class TokenAwareAutoComplete(AutoComplete)`
+
+AutoComplete subclass that replaces only the active token (text between the
+trigger and the cursor) on completion.
+
+| Parameter   | Type                   | Description                     |
+|-------------|------------------------|---------------------------------|
+| `keywords`  | `Keywords`             | Trigger detection helper        |
+| `resolvers` | `Mapping[str, Any]`    | Trigger-to-provider mapping     |
+
+#### `apply_completion(item, state)`
+
+Replace only the active token with the selected completion item.
+
+#### `_align_to_target()`
+
+Position the dropdown above the cursor, constrained to the screen.
+
+#### `_suffix_for(trigger: str) -> str`
+
+Return the suffix to append after a completion for the given trigger.
+
+---
+
+## `app.ui.textual.completion_provider.slash_provider`
+
+Completion provider for `/` commands.
+
+### `class SlashCommandProvider`
+
+Callable returning system-level command suggestions: `workspace`,
+`project`, `open`, `help`, `run`.
+
+#### `__call__(prefix: str) -> list[DropdownItem]`
+
+Return matching slash-command items.
+
+---
+
+## `app.ui.textual.completion_provider.at_provider`
+
+Completion provider for `@` context references.
+
+### `class ContextProvider`
+
+Callable returning context-reference suggestions for files, agents
+and resources.
+
+#### `__call__(prefix: str) -> list[DropdownItem]`
+
+Return matching context-reference items.
+
+---
+
+## `app.ui.textual.completion_provider.colon_provider`
+
+Completion provider for `:` power-user commands.
+
+### `class PowerCommandProvider`
+
+Callable returning power-user command suggestions: `ws`, `proj`,
+`open`, `clear`, `quit`.
+
+#### `__call__(prefix: str) -> list[DropdownItem]`
+
+Return matching power-command items.
+
+---
+
+## `app.ui.textual.completion_provider.hash_provider`
+
+Completion provider for `#` semantic entities.
+
+### `class SemanticProvider`
+
+Callable returning semantic entity suggestions: `User`, `Workspace`,
+`Project`, `Agent`, `Context`.  Matching is case-insensitive.
+
+#### `__call__(prefix: str) -> list[DropdownItem]`
+
+Return matching semantic-entity items.
+
+---
+
 ## `window`
 
 Textual TUI entry point providing a tabbed multi-session chat interface.
@@ -381,6 +555,7 @@ Tabbed multi-session Textual application.
 | `Ctrl+Y` | `select_project`     |
 | `Ctrl+N` | `new_session`        |
 | `Ctrl+D` | `close_session`      |
+| `Ctrl+K` | `clear_text`         |
 | `Ctrl+Q` | `quit`               |
 
 #### Key methods
@@ -394,4 +569,5 @@ Tabbed multi-session Textual application.
 - `on_mount()` -- Restore workspace/project references from config.
 - `action_new_session()` -- Create a new empty session tab.
 - `action_close_session()` -- Close the active session after confirmation.
+- `action_clear_text()` -- Clear all messages from the active chat area.
 - `on_input_submitted(event)` -- Append user message to active chat.

@@ -13,6 +13,7 @@ from textual_autocomplete import AutoComplete, DropdownItem
 from textual_autocomplete._autocomplete import TargetState
 from app.ui.textual.token_aware_auto_complete import TokenAwareAutoComplete
 
+from app.context.keywords import Keywords
 
 # Tipo del provider de autocompletado
 CompletionProvider = Callable[[str], List[DropdownItem]]
@@ -34,17 +35,19 @@ class ChatInput(Widget):
     """
 
     value: reactive[str] = reactive("")
-    CONTINUE_WRITE_VALID_CHARS = ("/", ":", "#", "@", ".")
+    # CONTINUE_WRITE_VALID_CHARS = ("/", ":", "#", "@", ".")
 
     def __init__(
         self,
         *,
+        keywords: Keywords,
         triggers: Dict[str, CompletionProvider],
         placeholder: str = "Escribe aquí…",
         id: Optional[str] = None,
     ):
         super().__init__(id=id)
         self.triggers = triggers
+        self.keywords = keywords
         self.placeholder = placeholder
 
     # ─────────────────────────────────────
@@ -57,6 +60,7 @@ class ChatInput(Widget):
             id="chat_input",
         )
         self._autocomplete = TokenAwareAutoComplete(
+            keywords=self.keywords,
             target=self._input,
             candidates=self._candidates,
             resolvers=self.triggers,
@@ -78,7 +82,8 @@ class ChatInput(Widget):
         before = text[:cursor]
 
         trigger_pos, trigger_len, trigger_char = (
-            self._autocomplete._find_last_trigger(before)
+            # self._autocomplete._find_last_trigger(before)
+            self.keywords.find_last_trigger(before)
         )
 
         if trigger_pos == -1 or trigger_char is None:
@@ -97,7 +102,8 @@ class ChatInput(Widget):
 
         return [
             DropdownItem(
-                main=item.main + ("" if str(item.main).endswith( self.CONTINUE_WRITE_VALID_CHARS ) else " "),
+                # main=item.main + ("" if str(item.main).endswith( self.CONTINUE_WRITE_VALID_CHARS ) else " "),
+                main=item.main + ("" if self.keywords.must_continue(item.main) else " "),
                 prefix=item.prefix,
             )
             for item in raw_items

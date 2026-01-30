@@ -7,6 +7,8 @@ from textual_autocomplete import AutoComplete
 from textual_autocomplete.fuzzy_search import FuzzySearch
 from textual_autocomplete._autocomplete import TargetState
 
+from app.context.keywords import Keywords
+
 class TokenFuzzySearch(FuzzySearch):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -21,17 +23,18 @@ class TokenAwareAutoComplete(AutoComplete):
     # BORDER = 2
     # PADDING = 1
 
-    VALID_TRIGGER_PREFIXES = {" ", "\t", "\n", "(", "[", "{", "<"}
+    # VALID_TRIGGER_PREFIXES = {" ", "\t", "\n", "(", "[", "{", "<"}
 
-    def __init__(self, *args, resolvers: Mapping[str, Any], **kwargs):
+    def __init__(self, *args, keywords: Keywords, resolvers: Mapping[str, Any], **kwargs):
         """
         resolvers: mapa donde las keys son los triggers ("/", "@", ":", "#", ...)
                    y el value puede ser lo que quieras (providers, TriggerConfig, etc.)
         """
         super().__init__(*args, **kwargs)
         self._fuzzy_search = TokenFuzzySearch()
+        self._keywords = keywords
         self._resolvers = resolvers
-        self._triggers: list[str] = sorted(resolvers.keys(), key=len, reverse=True)
+        # self._triggers: list[str] = sorted(resolvers.keys(), key=len, reverse=True)
 
     # ── inserción: reemplazar solo el bloque activo
     def apply_completion(self, item: DropdownItem, state: TargetState) -> None:
@@ -41,7 +44,7 @@ class TokenAwareAutoComplete(AutoComplete):
         before = text[:cursor]
         after = text[cursor:]
 
-        trigger_pos, trigger_len, trigger_char = self._find_last_trigger(before)
+        trigger_pos, trigger_len, trigger_char = self._keywords.find_last_trigger(before)
         if trigger_pos == -1:
             return
 
@@ -112,25 +115,25 @@ class TokenAwareAutoComplete(AutoComplete):
         cfg = self._resolvers.get(trigger)
         return getattr(cfg, "suffix", "")
 
-    def _find_last_trigger(self, before: str) -> tuple[int, int, str | None]:
-        trigger_pos = -1
-        trigger_len = 0
-        trigger_char = None
+    # def _find_last_trigger(self, before: str) -> tuple[int, int, str | None]:
+    #     trigger_pos = -1
+    #     trigger_len = 0
+    #     trigger_char = None
 
-        for t in self._triggers:
-            pos = before.rfind(t)
-            if pos == -1:
-                continue
+    #     for t in self._triggers:
+    #         pos = before.rfind(t)
+    #         if pos == -1:
+    #             continue
 
-            # validar contexto previo
-            if pos > 0:
-                prev = before[pos - 1]
-                if not (prev.isspace() or prev in self.VALID_TRIGGER_PREFIXES):
-                    continue
+    #         # validar contexto previo
+    #         if pos > 0:
+    #             prev = before[pos - 1]
+    #             if not (prev.isspace() or prev in self.VALID_TRIGGER_PREFIXES):
+    #                 continue
 
-            if pos > trigger_pos:
-                trigger_pos = pos
-                trigger_len = len(t)
-                trigger_char = t
+    #         if pos > trigger_pos:
+    #             trigger_pos = pos
+    #             trigger_len = len(t)
+    #             trigger_char = t
 
-        return trigger_pos, trigger_len, trigger_char
+    #     return trigger_pos, trigger_len, trigger_char

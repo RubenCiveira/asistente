@@ -25,6 +25,7 @@ from app.config import AppConfig
 from app.context.workspace import Workspace
 from app.context.project import Project
 from app.context.session import Session
+from app.context.keywords import Keywords
 
 from app.ui.textual.confirm import Confirm
 from app.ui.textual.chat_input import ChatInput
@@ -189,13 +190,15 @@ class MainApp(App):
 
     def compose(self) -> ComposeResult:
         """Build the widget tree: header, tabbed chat areas, input and footer."""
-        chat = ChatInput(
-            triggers={
+        resolvers = {
                 "/": SlashCommandProvider(),
                 "@": ContextProvider(),
                 ":": PowerCommandProvider(),
                 "#": SemanticProvider(),
-            },
+            }
+        chat = ChatInput(
+            keywords=Keywords( sorted(resolvers.keys(), key=len, reverse=True) ),
+            triggers=resolvers,
             id="chat_input",
         )
         yield Header()

@@ -19,14 +19,21 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, Markdown, TabbedContent, TabPane
 from textual.containers import Vertical, VerticalScroll
-from app.ui.textual.action.select_project import SelectProject
-from app.ui.textual.action.select_workspace import SelectWorkspace
-from app.ui.textual.confirm import Confirm
+from rich.text import Text
+
 from app.config import AppConfig
 from app.context.workspace import Workspace
 from app.context.project import Project
 from app.context.session import Session
 
+from app.ui.textual.confirm import Confirm
+from app.ui.textual.chat_input import ChatInput
+from app.ui.textual.action.select_project import SelectProject
+from app.ui.textual.action.select_workspace import SelectWorkspace
+from app.ui.textual.completion_provider.slash_provider import SlashCommandProvider
+from app.ui.textual.completion_provider.at_provider import ContextProvider
+from app.ui.textual.completion_provider.colon_provider import PowerCommandProvider
+from app.ui.textual.completion_provider.hash_provider import SemanticProvider
 
 class MainApp(App):
     """Tabbed multi-session Textual application.
@@ -59,6 +66,7 @@ class MainApp(App):
         ("ctrl+y", "select_project", "Project"),
         ("ctrl+n", "new_session", "New tab"),
         ("ctrl+d", "close_session", "Close tab"),
+        ("ctrl+k", "clear_text", "Clear text"),
         ("ctrl+q", "quit", "Quit"),
     ]
 
@@ -120,12 +128,18 @@ class MainApp(App):
         self.config.active_session_index = self.sessions.index(self.active_session)
         self.config.save()
 
-    def echo(self, result: Markdown | None) -> None:
+    def echo(self, result: Markdown | string | None) -> None:
         """Append a :class:`Markdown` widget to the active chat and scroll down."""
-        if result is not None:
-            chat = self._active_chat()
-            chat.mount(result)
-            chat.scroll_end(animate=False)
+        if result is None:
+            return
+        chat = self._active_chat()
+        if isinstance(result, Markdown):
+            widget = result
+        else:
+            # si el chat espera un widget, lo conviertes a Markdown (o a Label/Static)
+            widget = Markdown(str(result))
+        chat.mount(widget)
+        chat.scroll_end(animate=False)
 
     def _log(self, text: str) -> None:
         """Convenience wrapper: mount a Markdown widget with *text*."""
@@ -175,13 +189,23 @@ class MainApp(App):
 
     def compose(self) -> ComposeResult:
         """Build the widget tree: header, tabbed chat areas, input and footer."""
+        chat = ChatInput(
+            triggers={
+                "/": SlashCommandProvider(),
+                "@": ContextProvider(),
+                ":": PowerCommandProvider(),
+                "#": SemanticProvider(),
+            },
+            id="chat_input",
+        )
         yield Header()
         with Vertical():
             with TabbedContent(id="tabs"):
                 for session in self.sessions:
                     with TabPane(self._tab_label(session), id=f"tab-{session.id}"):
                         yield VerticalScroll(id=f"chat-{session.id}", classes="session-chat")
-            yield Input(placeholder="Escribe aqui... (Enter para enviar)", id="prompt")
+            # yield Input(placeholder="Escribe aqui... (Enter para enviar)", id="prompt")
+            yield chat
             yield Footer()
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
@@ -207,6 +231,12 @@ class MainApp(App):
         tabs = self.query_one("#tabs", TabbedContent)
         tab = tabs.get_tab(f"tab-{session.id}")
         tab.label = self._tab_label(session)
+
+    def action_clear_text(self) -> None:
+        chat = self._active_chat()
+        chat.remove_children()
+        chat.refresh(layout=True)
+        chat.scroll_end(animate=False)
 
     def action_select_project(self) -> None:
         """Keybinding action: launch the project-selection flow."""
@@ -282,7 +312,7 @@ class MainApp(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Append the user's message to the active chat when Enter is pressed."""
-        if event.input.id != "prompt":
+        if event.input.id != "chat_input":
             return
         text = event.value.strip()
         if not text:

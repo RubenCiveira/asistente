@@ -1,3 +1,12 @@
+"""Chat input widget with trigger-based autocomplete.
+
+Wraps a Textual :class:`~textual.widgets.Input` with a
+:class:`~app.ui.textual.token_aware_auto_complete.TokenAwareAutoComplete`
+overlay.  Each trigger character (``/``, ``@``, ``:``, ``#``, etc.) is
+mapped to a :data:`CompletionProvider` callable that returns matching
+:class:`~textual_autocomplete.DropdownItem` suggestions.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,12 +24,23 @@ from app.ui.textual.token_aware_auto_complete import TokenAwareAutoComplete
 
 from app.context.keywords import Keywords
 
-# Tipo del provider de autocompletado
 CompletionProvider = Callable[[str], List[DropdownItem]]
+"""Type alias for a completion provider: receives a prefix and returns items."""
+
 
 class ChatInput(Widget):
-    """
-    Chat input with trigger-based autocomplete (/, @, :, #, ...)
+    """Composite widget providing a text input with trigger-based autocomplete.
+
+    When the user types a trigger character (after whitespace or at the start
+    of the line), the corresponding :data:`CompletionProvider` is invoked and
+    matching suggestions appear in a dropdown.
+
+    Args:
+        keywords: :class:`~app.context.keywords.Keywords` instance managing
+            trigger detection.
+        triggers: Mapping from trigger strings to their completion providers.
+        placeholder: Placeholder text shown when the input is empty.
+        id: Optional widget identifier.
     """
 
     DEFAULT_CSS = """
@@ -45,6 +65,14 @@ class ChatInput(Widget):
         placeholder: str = "Escribe aquí…",
         id: Optional[str] = None,
     ):
+        """Initialise the chat input widget.
+
+        Args:
+            keywords: Keywords helper for trigger detection.
+            triggers: Mapping of trigger string to provider callable.
+            placeholder: Placeholder text for the inner Input.
+            id: Optional widget DOM id.
+        """
         super().__init__(id=id)
         self.triggers = triggers
         self.keywords = keywords
@@ -55,6 +83,7 @@ class ChatInput(Widget):
     # ─────────────────────────────────────
 
     def compose(self):
+        """Build the widget tree: an Input and a TokenAwareAutoComplete overlay."""
         self._input = Input(
             placeholder=self.placeholder,
             id="chat_input",
@@ -70,6 +99,7 @@ class ChatInput(Widget):
         yield self._autocomplete
 
     def on_mount(self) -> None:
+        """Focus the inner input on mount."""
         self._input.focus()
 
     # ─────────────────────────────────────
@@ -77,6 +107,18 @@ class ChatInput(Widget):
     # ─────────────────────────────────────
 
     def _candidates(self, state: TargetState) -> List[DropdownItem]:
+        """Return autocomplete suggestions for the current input state.
+
+        Locates the last trigger in the text before the cursor, invokes the
+        corresponding provider with the token typed after the trigger, and
+        returns the filtered items.
+
+        Args:
+            state: Autocomplete target state with text and cursor position.
+
+        Returns:
+            A list of :class:`DropdownItem` suggestions.
+        """
         text = state.text or ""
         cursor = state.cursor_position
         before = text[:cursor]
@@ -114,6 +156,7 @@ class ChatInput(Widget):
     # ─────────────────────────────────────
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle Enter: post a :class:`Submitted` message and clear the input."""
         if event.input is not self._input:
             return
         text = (event.value or "")
@@ -124,8 +167,13 @@ class ChatInput(Widget):
         self.post_message(self.Submitted(text))
         self._input.value = ""
 
-    # Mensaje propio del componente
     class Submitted(Message):
+        """Message posted when the user submits text via Enter.
+
+        Attributes:
+            value: The submitted text.
+        """
+
         def __init__(self, value: str):
             super().__init__()
             self.value = value

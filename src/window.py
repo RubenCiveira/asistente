@@ -236,6 +236,7 @@ class MainApp(App):
         tab.label = self._tab_label(session)
 
     def action_clear_text(self) -> None:
+        """Keybinding action: clear all messages from the active chat area."""
         chat = self._active_chat()
         chat.remove_children()
         chat.refresh(layout=True)

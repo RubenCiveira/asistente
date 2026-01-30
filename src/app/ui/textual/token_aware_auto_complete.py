@@ -1,3 +1,11 @@
+"""Token-aware autocomplete overlay for Textual inputs.
+
+Extends :class:`~textual_autocomplete.AutoComplete` so that completions
+replace only the active token (the text between the last trigger character
+and the cursor) rather than the entire input value.  The dropdown is
+positioned above the cursor to avoid overlapping with the chat area.
+"""
+
 from __future__ import annotations
 
 from typing import Mapping, Any, Iterable
@@ -9,35 +17,61 @@ from textual_autocomplete._autocomplete import TargetState
 
 from app.context.keywords import Keywords
 
+
 class TokenFuzzySearch(FuzzySearch):
+    """Fuzzy search that bypasses query filtering.
+
+    Because the candidate list is already filtered by the completion
+    provider, this implementation always returns a perfect score so that
+    every candidate supplied by the provider appears in the dropdown.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def match(self, query: str, candidate: str) -> tuple[float, Sequence[int]]:
+        """Return a perfect match score regardless of *query*."""
         return super().match(candidate, candidate)
 
+
 class TokenAwareAutoComplete(AutoComplete):
-    """AutoComplete que filtra usando solo el token activo (tras el último trigger)."""
+    """AutoComplete subclass that filters and inserts using only the active token.
 
-    # ITEM_HEIGHT = 1
-    # BORDER = 2
-    # PADDING = 1
+    Instead of replacing the entire input value on completion, this class
+    locates the trigger character preceding the cursor and replaces only
+    the token between the trigger and the cursor position.
 
-    # VALID_TRIGGER_PREFIXES = {" ", "\t", "\n", "(", "[", "{", "<"}
+    Args:
+        keywords: :class:`~app.context.keywords.Keywords` instance for
+            trigger detection.
+        resolvers: Mapping from trigger strings to provider objects.  The
+            provider may optionally expose a ``suffix`` attribute that is
+            appended after the completed text.
+    """
 
     def __init__(self, *args, keywords: Keywords, resolvers: Mapping[str, Any], **kwargs):
-        """
-        resolvers: mapa donde las keys son los triggers ("/", "@", ":", "#", ...)
-                   y el value puede ser lo que quieras (providers, TriggerConfig, etc.)
+        """Initialise with trigger resolvers and keyword helper.
+
+        Args:
+            keywords: Keywords instance used to locate triggers.
+            resolvers: Mapping of trigger string to provider/config object.
         """
         super().__init__(*args, **kwargs)
         self._fuzzy_search = TokenFuzzySearch()
         self._keywords = keywords
         self._resolvers = resolvers
-        # self._triggers: list[str] = sorted(resolvers.keys(), key=len, reverse=True)
 
-    # ── inserción: reemplazar solo el bloque activo
     def apply_completion(self, item: DropdownItem, state: TargetState) -> None:
+        """Replace only the active token with the selected completion item.
+
+        Locates the trigger preceding the cursor, computes the token span,
+        and rewrites just that portion of the input, leaving text before
+        the trigger and after the cursor untouched.
+
+        Args:
+            item: The selected dropdown item.
+            state: Current autocomplete target state.
+        """
         input_widget = self.target  # el Input target
         text = state.text or ""
         cursor = state.cursor_position
@@ -77,6 +111,11 @@ class TokenAwareAutoComplete(AutoComplete):
         input_widget.cursor_position = new_cursor
 
     def _align_to_target(self) -> None:
+        """Position the dropdown above the cursor, constrained to the screen.
+
+        Calculates available vertical space above the cursor and sizes
+        the dropdown accordingly so it does not overflow the visible area.
+        """
         x, y = self.target.cursor_screen_offset
         dropdown = self.option_list
 
@@ -112,6 +151,11 @@ class TokenAwareAutoComplete(AutoComplete):
     # ──────────────────────────────
 
     def _suffix_for(self, trigger: str) -> str:
+        """Return the suffix string to append after a completion for *trigger*.
+
+        If the resolver for *trigger* has a ``suffix`` attribute it is used;
+        otherwise an empty string is returned.
+        """
         cfg = self._resolvers.get(trigger)
         return getattr(cfg, "suffix", "")
 

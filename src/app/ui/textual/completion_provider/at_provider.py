@@ -1,11 +1,30 @@
+"""Completion provider for at (``@``) context references.
+
+Returns context-reference suggestions such as file names, agent
+identifiers and resource paths when the user types ``@`` followed by
+a prefix.
+"""
+
 from textual_autocomplete import DropdownItem
 
+
 class ContextProvider:
-    """
-    '@' → referencias de contexto (archivos, agentes, recursos)
+    """Provide autocomplete items for ``@`` context references.
+
+    Callable that receives the typed prefix after ``@`` and returns
+    matching :class:`DropdownItem` suggestions for files, agents and
+    other context resources.
     """
 
     def __call__(self, prefix: str) -> list[DropdownItem]:
+        """Return context-reference suggestions matching *prefix*.
+
+        Args:
+            prefix: Text typed after the ``@`` trigger.
+
+        Returns:
+            A list of matching :class:`DropdownItem` instances.
+        """
         # dummy por ahora
         items = [
             "README.md",
@@ -15,7 +34,7 @@ class ContextProvider:
             "agent:executor",
         ]
         if prefix.startswith("src/"):
-            items = items + [ prefix + "golo/" ]
+            items = items + [prefix + "golo/"]
         return [
             DropdownItem(
                 main=f"{item}",

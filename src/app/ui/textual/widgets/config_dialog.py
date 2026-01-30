@@ -64,19 +64,9 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen
-from textual.widgets import (
-    Button,
-    Checkbox,
-    Input,
-    Label,
-    ListItem,
-    ListView,
-    RadioButton,
-    RadioSet,
-    SelectionList,
-    Static,
-    Tree,
-)
+from textual.widgets import Button, Static, Tree
+
+from .form import SchemaForm
 
 
 @dataclass
@@ -117,7 +107,8 @@ class ConfigValues:
     values: Dict[str, Any] = field(default_factory=dict)
     childs: Dict[str, "ConfigValues"] = field(default_factory=dict)
 
-
+# FIXME: if apply => clear form pending 
+# FIXME: if change page and form isPending => confirm.
 class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
     """Modal configuration dialog with a page tree and dynamic forms.
 
@@ -254,10 +245,8 @@ class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
         self._page_index: Dict[str, ConfigPage] = {}
         # Parent mapping: page_id -> parent_page_id (None for roots)
         self._parent_map: Dict[str, Optional[str]] = {}
-        # Track per-page array backing lists: page_id -> {field: [values]}
-        self._array_stores: Dict[str, Dict[str, List[Any]]] = {}
-
         self._current_page: Optional[ConfigPage] = None
+        self._form: Optional[SchemaForm] = None
 
         self._index_pages(self._pages, None)
         self._load_initial_values()
@@ -361,121 +350,13 @@ class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
         container.remove_children()
         self.query_one("#config-errors", Static).update("")
 
-        properties = page.schema.get("properties", {})
-        required = set(page.schema.get("required", []))
         stored = self._page_values.get(page.id, {})
-
-        # Initialise array stores for this page
-        if page.id not in self._array_stores:
-            self._array_stores[page.id] = {}
-
-        for name, spec in properties.items():
-            value = stored.get(name, spec.get("default"))
-            self._mount_field(container, page.id, name, spec, name in required, value)
-
-    def _mount_field(
-        self,
-        container: VerticalScroll,
-        page_id: str,
-        name: str,
-        spec: Dict[str, Any],
-        required: bool,
-        value: Any,
-    ) -> None:
-        """Mount a single field (label + widget) into *container*."""
-        label_text = name
-        if spec.get("description"):
-            label_text += f" -- {spec['description']}"
-        if spec.get("default") is not None and value is None:
-            label_text += f" [default: {spec['default']}]"
-        if required:
-            label_text += " *"
-
-        widget_id = f"cfg-{page_id}-{name}"
-
-        if "oneOf" in spec:
-            buttons = [
-                RadioButton(
-                    opt.get("title", str(opt["const"])),
-                    id=f"{widget_id}--{opt['const']}",
-                )
-                for opt in spec["oneOf"]
-            ]
-            rs = RadioSet(*buttons, id=widget_id)
-            if value is not None:
-                for rb in rs.query(RadioButton):
-                    if rb.id == f"{widget_id}--{value}":
-                        rb.value = True
-                        break
-            container.mount(Static(label_text, classes="config-field-label"), rs)
-
-        elif "enum" in spec:
-            buttons = [
-                RadioButton(str(opt), id=f"{widget_id}--{opt}")
-                for opt in spec["enum"]
-            ]
-            rs = RadioSet(*buttons, id=widget_id)
-            if value is not None:
-                for rb in rs.query(RadioButton):
-                    if rb.id == f"{widget_id}--{value}":
-                        rb.value = True
-                        break
-            container.mount(Static(label_text, classes="config-field-label"), rs)
-
-        elif spec.get("type") == "boolean":
-            cb = Checkbox(label_text, id=widget_id)
-            if value is not None:
-                cb.value = bool(value)
-            container.mount(cb)
-
-        elif spec.get("type") == "array":
-            items_spec = spec.get("items", {})
-            if "oneOf" in items_spec or "enum" in items_spec:
-                options: list = []
-                if "oneOf" in items_spec:
-                    for opt in items_spec["oneOf"]:
-                        val = opt.get("const")
-                        title = opt.get("title", str(val))
-                        options.append((title, str(val)))
-                else:
-                    for opt in items_spec["enum"]:
-                        options.append((str(opt), str(opt)))
-                sl: SelectionList[str] = SelectionList[str](
-                    *options, id=widget_id
-                )
-                for v in value or []:
-                    sl.select(str(v))
-                container.mount(
-                    Static(label_text, classes="config-field-label"), sl
-                )
-            else:
-                # Free-text array
-                arr = list(value or [])
-                self._array_stores.setdefault(page_id, {})[name] = arr
-                lv = ListView(
-                    *[ListItem(Label(str(v))) for v in arr],
-                    id=widget_id,
-                    classes="config-array-items",
-                )
-                inp = Input(
-                    placeholder="Add item and press Enter",
-                    id=f"{widget_id}--input",
-                )
-                container.mount(
-                    Static(label_text, classes="config-field-label"),
-                    lv,
-                    Horizontal(
-                        inp,
-                        Button("Add", id=f"{widget_id}--add"),
-                        classes="config-array-row",
-                    ),
-                )
-
-        else:
-            inp = Input(placeholder=label_text, id=widget_id)
-            if value is not None:
-                inp.value = str(value)
-            container.mount(Static(label_text, classes="config-field-label"), inp)
+        self._form = SchemaForm(
+            page.schema,
+            initial_values=stored,
+            id_prefix=f"cfg-{page.id}",
+        )
+        container.mount(self._form)
 
     # ------------------------------------------------------------------
     # Reading field values
@@ -486,50 +367,9 @@ class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
         if self._current_page is None:
             return
         page = self._current_page
-        properties = page.schema.get("properties", {})
-        values: Dict[str, Any] = {}
-        for name, spec in properties.items():
-            val = self._read_field_value(page.id, name, spec)
-            if val is not None:
-                values[name] = val
-        self._page_values[page.id] = values
-
-    def _read_field_value(
-        self, page_id: str, name: str, spec: Dict[str, Any]
-    ) -> Any:
-        """Read the value from a single field widget."""
-        widget_id = f"cfg-{page_id}-{name}"
-        try:
-            w = self.query_one(f"#{widget_id}")
-        except Exception:
-            return None
-
-        if isinstance(w, SelectionList):
-            return list(w.selected)
-
-        if isinstance(w, RadioSet):
-            prefix = f"{widget_id}--"
-            for btn in w.query(RadioButton):
-                if btn.value and btn.id and btn.id.startswith(prefix):
-                    raw = btn.id[len(prefix):]
-                    return self._cast_value(raw, spec.get("type", "string"))
-            return None
-
-        if isinstance(w, Checkbox):
-            return w.value
-
-        if isinstance(w, Input):
-            raw = w.value.strip()
-            if not raw:
-                return None
-            return self._cast_value(raw, spec.get("type", "string"))
-
-        if isinstance(w, ListView):
-            # Free-text array — values kept in _array_stores
-            arr = self._array_stores.get(page_id, {}).get(name, [])
-            return list(arr)
-
-        return None
+        if self._form is None:
+            return
+        self._page_values[page.id] = self._form.get_values()
 
     # ------------------------------------------------------------------
     # Array helpers
@@ -549,64 +389,13 @@ class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
 
     def _handle_array_add(self, button_id: str) -> None:
         """Add item to a free-text array field."""
-        # button_id = "cfg-<page_id>-<field>--add"
-        base_id = button_id.removesuffix("--add")
-        input_id = f"{base_id}--input"
-        try:
-            inp = self.query_one(f"#{input_id}", Input)
-            lv = self.query_one(f"#{base_id}", ListView)
-        except Exception:
+        if self._form is None:
             return
-
-        raw = inp.value.strip()
-        if not raw:
+        error = self._form.handle_array_add(button_id)
+        if error:
+            self.query_one("#config-errors", Static).update(error)
             return
-
-        # Extract page_id and field name from base_id
-        # base_id = "cfg-<page_id>-<field>"
-        parts = base_id.split("-", 2)
-        if len(parts) < 3:
-            return
-        page_id = parts[1]
-        field_name = parts[2]
-
-        page = self._page_index.get(page_id)
-        if page is None:
-            return
-        spec = page.schema.get("properties", {}).get(field_name, {})
-        items_spec = spec.get("items", {})
-        item_type = items_spec.get("type", "string")
-
-        try:
-            value = self._cast_value(raw, item_type)
-        except ValueError as e:
-            self.query_one("#config-errors", Static).update(str(e))
-            return
-
-        # Validate item
-        v = Draft202012Validator(items_spec)
-        item_errors = [e.message for e in v.iter_errors(value)]
-        if item_errors:
-            self.query_one("#config-errors", Static).update(
-                "\n".join(f"* {e}" for e in item_errors)
-            )
-            return
-
-        arr = self._array_stores.setdefault(page_id, {}).setdefault(
-            field_name, []
-        )
-
-        if spec.get("uniqueItems", False) and value in arr:
-            self.query_one("#config-errors", Static).update(
-                "Duplicate value not allowed"
-            )
-            return
-
-        arr.append(value)
         self.query_one("#config-errors", Static).update("")
-        inp.value = ""
-        lv.append(ListItem(Label(str(value))))
-        inp.focus()
 
     # ------------------------------------------------------------------
     # Collecting / reconstructing values
@@ -684,38 +473,3 @@ class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _cast_value(raw: str, field_type: str) -> Any:
-        """Convert *raw* string to the Python type implied by *field_type*.
-
-        Parameters
-        ----------
-        raw:
-            The non-empty string entered by the user.
-        field_type:
-            One of ``"string"``, ``"integer"``, ``"number"`` or
-            ``"boolean"``.
-
-        Returns
-        -------
-        str | int | float | bool
-
-        Raises
-        ------
-        ValueError
-            If conversion fails or the type is unsupported.
-        """
-        if field_type == "string":
-            return raw
-        if field_type == "integer":
-            return int(raw)
-        if field_type == "number":
-            return float(raw)
-        if field_type == "boolean":
-            if raw.lower() in ("true", "yes", "y", "1"):
-                return True
-            if raw.lower() in ("false", "no", "n", "0"):
-                return False
-            raise ValueError("Expected boolean (yes/no, true/false)")
-        raise ValueError(f"Unsupported type {field_type}")

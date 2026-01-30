@@ -85,7 +85,6 @@ class AppConfigDialog(ConfigDialog):
         self._page_index.clear()
         self._parent_map.clear()
         self._page_values.clear()
-        self._array_stores.clear()
         self._index_pages(self._pages, None)
         self._load_initial_values()
 

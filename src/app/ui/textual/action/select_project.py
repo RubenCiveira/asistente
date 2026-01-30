@@ -1,3 +1,9 @@
+"""TUI action for selecting or creating a project within the active workspace.
+
+Presents the user with a list of known projects (if any) or jumps straight
+to the new-project flow via :class:`~app.ui.textual.path_dialog.PathDialog`.
+"""
+
 from __future__ import annotations
 
 from textual.app import App
@@ -14,10 +20,22 @@ _NEW_PROJECT = "__new__"
 
 
 class SelectProject:
+    """Action that guides the user through picking or creating a project.
+
+    Args:
+        window: The main application instance (provides ``push_screen_wait``,
+            ``echo``, ``get_active_workspace`` and ``select_project``).
+    """
+
     def __init__(self, window):
         self.window = window
 
     async def run(self):
+        """Execute the full project-selection flow.
+
+        Shows an error if no workspace is active; otherwise delegates to
+        :meth:`select_project` and applies the result.
+        """
         ws = self.window.get_active_workspace()
         if ws is None:
             self.window.echo(Markdown("Error: no hay workspace seleccionado."))
@@ -28,6 +46,14 @@ class SelectProject:
             self.window.select_project(prj)
 
     async def select_project(self, ws):
+        """Show a form with existing projects or fall through to :meth:`new_project`.
+
+        Args:
+            ws: The active :class:`~app.context.workspace.Workspace`.
+
+        Returns:
+            A :class:`~app.context.project.Project` or ``None`` on cancel.
+        """
         projects = ws.projects or []
 
         if projects:
@@ -63,6 +89,14 @@ class SelectProject:
         return await self.new_project()
 
     async def new_project(self):
+        """Open a :class:`PathDialog` for the user to pick a new project directory.
+
+        If the chosen directory does not exist a confirmation dialog is shown
+        before creating it.
+
+        Returns:
+            A :class:`~app.context.project.Project` or ``None`` on cancel.
+        """
         result = await self.window.push_screen_wait(
             PathDialog(
                 root_dir=Path.home(),

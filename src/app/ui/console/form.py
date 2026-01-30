@@ -1,3 +1,11 @@
+"""Console (prompt_toolkit) form renderer driven by JSON Schema.
+
+Provides an interactive, field-by-field form in the terminal.  Each field
+is prompted according to its JSON Schema type (scalar, enum, oneOf, array)
+with incremental cross-field validation.  The user can navigate backwards
+with Escape and cancel the form entirely from the first field.
+"""
+
 from typing import Any, Dict, List
 from prompt_toolkit import prompt
 from prompt_toolkit.key_binding import KeyBindings
@@ -9,11 +17,21 @@ from jsonschema import (
 
 
 class _EscapePressed(Exception):
-    pass
+    """Sentinel exception raised when the user presses Escape during input."""
 
 
 class ConsoleFormRenderer:
-    def __init__(self):
+    """Interactive terminal form renderer backed by JSON Schema.
+
+    Walks the user through each property defined in the schema, validates
+    input incrementally and returns the collected data as a ``dict``.
+
+    Attributes:
+        schema: The full JSON Schema currently being rendered.
+        field_order: Ordered list of property names to prompt.
+    """
+
+    def __init__(self) -> None:
         self.schema: Dict[str, Any] | None = None
         self.field_order: List[str] = []
         self._kb = KeyBindings()
@@ -23,6 +41,7 @@ class ConsoleFormRenderer:
             event.app.exit(exception=_EscapePressed())
 
     def _prompt(self, message: str) -> str:
+        """Display *message* and return the user's input line."""
         return prompt(message, key_bindings=self._kb)
 
     # ============================================================
@@ -30,6 +49,17 @@ class ConsoleFormRenderer:
     # ============================================================
 
     def ask_form(self, json_schema: Dict[str, Any]) -> Dict[str, Any] | None:
+        """Prompt the user for every field in *json_schema* and return the result.
+
+        Args:
+            json_schema: A JSON Schema with ``type: "object"``.
+
+        Returns:
+            A ``dict`` of collected values, or ``None`` if the user cancels.
+
+        Raises:
+            ValueError: If the schema type is not ``"object"``.
+        """
         if json_schema.get("type") != "object":
             raise ValueError("Only JSON Schema with type=object is supported")
 
@@ -108,9 +138,18 @@ class ConsoleFormRenderer:
         candidate_value: Any,
         partial_data: Dict[str, Any],
     ) -> List[str]:
-        """
-        Valida un campo considerando solo los campos
-        definidos hasta ese punto del formulario.
+        """Validate a single field in the context of previously filled fields.
+
+        Builds a sub-schema containing only the fields visible so far and
+        runs Draft 2020-12 validation against it.
+
+        Args:
+            field_name: Name of the field being validated.
+            candidate_value: Value the user entered for the field.
+            partial_data: Values already collected for earlier fields.
+
+        Returns:
+            A list of human-readable error messages (empty on success).
         """
 
         assert self.schema is not None
@@ -147,6 +186,7 @@ class ConsoleFormRenderer:
     # ============================================================
 
     def _ask_field(self, name: str, spec: Dict[str, Any], required: bool, partial_data: Dict[str, Any] | None = None):
+        """Prompt for a single field, dispatching to the appropriate input handler."""
         description = spec.get("description", "")
         default = spec.get("default")
 
@@ -185,6 +225,7 @@ class ConsoleFormRenderer:
     # ============================================================
 
     def _ask_scalar(self, label, field_type, default, required):
+        """Prompt for a simple scalar value (string, integer, number, boolean)."""
         label += ": "
 
         while True:
@@ -204,6 +245,7 @@ class ConsoleFormRenderer:
                 print(f"❌ {e}")
 
     def _ask_enum(self, label, enum, default, required, field_type):
+        """Prompt for a value from a fixed set of allowed values."""
         print(f"\n{label}:")
         for i, opt in enumerate(enum, start=1):
             print(f"  {i}) {opt}")
@@ -243,6 +285,7 @@ class ConsoleFormRenderer:
             print("❌ Invalid option")
 
     def _ask_one_of(self, label, options, default, required):
+        """Prompt for a selection from a ``oneOf`` list of titled constants."""
         print(f"\n{label}:")
         values = []
 
@@ -281,6 +324,7 @@ class ConsoleFormRenderer:
             print("❌ Invalid option")
 
     def _ask_array(self, label, spec, required, field_name, partial_data):
+        """Prompt for an array value (multi-select or free-text items)."""
         items = spec.get("items", {})
         default = spec.get("default", [])
         min_items = spec.get("minItems", 0)
@@ -413,6 +457,19 @@ class ConsoleFormRenderer:
     # ============================================================
 
     def _cast_value(self, raw: str, field_type: str):
+        """Convert a raw string to the Python type indicated by *field_type*.
+
+        Args:
+            raw: The string entered by the user.
+            field_type: JSON Schema type (``"string"``, ``"integer"``,
+                ``"number"`` or ``"boolean"``).
+
+        Returns:
+            The converted value.
+
+        Raises:
+            ValueError: If the conversion fails or the type is unsupported.
+        """
         if field_type == "string":
             return raw
         if field_type == "integer":
@@ -428,8 +485,14 @@ class ConsoleFormRenderer:
         raise ValueError(f"Unsupported field type: {field_type}")
 
     def _validate_array_item(self, item_value, item_schema) -> list[str]:
-        """
-        Valida un único elemento del array contra el schema 'items'
+        """Validate a single array element against the ``items`` sub-schema.
+
+        Args:
+            item_value: The value to validate.
+            item_schema: The JSON Schema for array items.
+
+        Returns:
+            A list of error messages (empty on success).
         """
         validator = Draft202012Validator(item_schema)
         errors = list(validator.iter_errors(item_value))
@@ -441,9 +504,19 @@ class ConsoleFormRenderer:
         values: list,
         partial_data: dict,
     ) -> list[str]:
-        """
-        Valida el array completo (minItems, uniqueItems, contains, etc.)
-        dentro del contexto incremental.
+        """Validate the full array in the incremental context.
+
+        Delegates to :meth:`_validate_field_incremental` so that cross-field
+        constraints (``minItems``, ``uniqueItems``, ``contains``, etc.) are
+        checked.
+
+        Args:
+            field_name: Name of the array field.
+            values: Current list of collected values.
+            partial_data: Previously collected field values.
+
+        Returns:
+            A list of error messages (empty on success).
         """
         return self._validate_field_incremental(
             field_name=field_name,

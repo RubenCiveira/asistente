@@ -1,3 +1,9 @@
+"""Manual TUI smoke test for PathDialog.
+
+This is **not** a pytest test.  It is an interactive action class that can
+be wired into the running TUI to exercise :class:`PathDialog`.
+"""
+
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
@@ -11,11 +17,19 @@ from app.ui.textual.path_dialog import PathDialog
 
 from app.config import AppConfig, default_workspaces_dir
 
+
 class TestPath:
+    """Interactive demo action that opens a :class:`PathDialog` and echoes the result.
+
+    Args:
+        window: The main application instance.
+    """
+
     def __init__(self, window: App):
         self.window = window
 
     async def run(self):
+        """Show a PathDialog and display the selected path."""
         result = await self.window.push_screen_wait(
             PathDialog(
                 root_dir=Path("/Users/ruben.civeiraiglesia/"),

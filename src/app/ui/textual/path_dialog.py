@@ -1,3 +1,11 @@
+"""File and directory browser modal with autocomplete suggestions.
+
+Presents an input field where the user can type a path relative to a given
+root directory.  Suggestions are provided via ``textual-autocomplete`` and
+the result is validated against configurable constraints (must exist, file
+vs. directory, name filter, etc.).
+"""
+
 from __future__ import annotations
 
 import re
@@ -11,7 +19,30 @@ from textual.containers import Vertical, Horizontal
 from textual_autocomplete import AutoComplete, DropdownItem
 from textual_autocomplete._autocomplete import TargetState  # callback state (v4)
 
+
 class PathDialog(ModalScreen[Optional[Path]]):
+    """Modal path-selection dialog with filesystem autocomplete.
+
+    The dialog shows an input field pre-populated with an optional
+    *initial_path* and offers autocomplete suggestions drawn from the
+    filesystem under *root_dir*.  On submission the entered value is
+    validated and the resolved :class:`~pathlib.Path` is returned, or
+    ``None`` when the user cancels.
+
+    Args:
+        root_dir: Base directory; all paths are resolved relative to it.
+        must_exist: When ``True`` the selected path must already exist.
+        warn_if_exists: When ``True`` an existing path is rejected.
+        select: Constrain selection to ``"file"``, ``"dir"`` or ``"any"``.
+        initial_path: Pre-fill the input with this path.
+        name_filter: Optional regex applied to entry names.
+        relative_check_path: If set, reject paths where this relative
+            sub-path already exists.
+        title: Dialog heading.
+        sub_title: Secondary text shown below the title.
+        max_suggestions: Maximum number of autocomplete suggestions.
+    """
+
     DEFAULT_CSS = """
     PathDialog {
         align: center middle;
@@ -93,6 +124,7 @@ class PathDialog(ModalScreen[Optional[Path]]):
         self.max_suggestions = max_suggestions
 
     def compose(self):
+        """Build the dialog widget tree with input, autocomplete and buttons."""
         if self.initial_path:
             resolved = self.initial_path.expanduser().resolve()
             initial = "/" + str(resolved.relative_to(self.root_dir))
@@ -122,26 +154,41 @@ class PathDialog(ModalScreen[Optional[Path]]):
         )
 
     def on_mount(self) -> None:
+        """Focus the path input on mount."""
         self.query_one("#path_input", Input).focus()
 
     # ---------- Actions / Buttons ----------
 
     def action_cancel(self) -> None:
+        """Handle Escape by dismissing with ``None``."""
         self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Route button presses to cancel or accept."""
         if event.button.id == "btn_cancel":
             self.dismiss(None)
         elif event.button.id == "btn_ok":
             self._try_accept()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Treat Enter in the path input as an accept attempt."""
         if event.input.id == "path_input":
             self._try_accept()
 
     # ---------- AutoComplete callback (v4) ----------
 
     def _candidates(self, state):
+        """Return autocomplete suggestions for the current input text.
+
+        Lists entries under the resolved directory, filtering by name,
+        type and visibility constraints.
+
+        Args:
+            state: Autocomplete target state containing the current text.
+
+        Returns:
+            A list of :class:`DropdownItem` suggestions.
+        """
         text = state.text or ""
 
         try:
@@ -210,12 +257,22 @@ class PathDialog(ModalScreen[Optional[Path]]):
     # ---------- Validation / Accept ----------
 
     def _try_accept(self) -> None:
+        """Read the input value, validate it and dismiss if valid."""
         raw = self.query_one("#path_input", Input).value
         path = self._validate(raw)
         if path is not None:
             self.dismiss(path)
 
     def _validate(self, raw: str) -> Optional[Path]:
+        """Validate the raw input string against all configured constraints.
+
+        Args:
+            raw: Text entered by the user (relative to *root_dir*).
+
+        Returns:
+            The resolved absolute path on success, or ``None`` when
+            validation fails (an error message is shown in the dialog).
+        """
         self._show_error("")
 
         absolute = self._to_absolute(raw)
@@ -250,8 +307,14 @@ class PathDialog(ModalScreen[Optional[Path]]):
 
 
     def _show_error(self, msg: str) -> None:
+        """Display *msg* in the error label (red), or clear it when empty."""
         self.query_one("#error", Static).update(f"[red]{msg}[/red]" if msg else "")
 
     def _to_absolute(self, relative: str) -> Path:
+        """Convert a user-entered relative string to an absolute path.
+
+        Leading ``/`` characters are stripped so that ``/sub`` resolves to
+        ``root_dir / sub``.
+        """
         rel = relative.lstrip("/")  # "/" → ""
         return (self.root_dir / rel).resolve(strict=False)

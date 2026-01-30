@@ -1,3 +1,17 @@
+"""Textual TUI entry point providing a tabbed multi-session chat interface.
+
+Each tab corresponds to a :class:`~app.context.session.Session` that binds a
+workspace and a project.  The application persists open sessions to disk so
+that they are restored on the next launch.
+
+Keyboard shortcuts:
+    Ctrl+W  Select workspace
+    Ctrl+Y  Select project
+    Ctrl+N  Open a new session tab
+    Ctrl+D  Close the active session tab
+    Ctrl+Q  Quit
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,7 +27,16 @@ from app.context.workspace import Workspace
 from app.context.project import Project
 from app.context.session import Session
 
+
 class MainApp(App):
+    """Tabbed multi-session Textual application.
+
+    Manages a list of :class:`~app.context.session.Session` objects, each
+    rendered as a tab with its own chat scroll area.  Workspace and project
+    selection, session creation/closing and header updates are handled
+    through keyboard bindings and action helpers.
+    """
+
     CSS = """
     #tabs {
         height: 1fr;
@@ -39,7 +62,8 @@ class MainApp(App):
         ("ctrl+q", "quit", "Quit"),
     ]
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialise the app, restoring sessions from the persisted config."""
         super().__init__()
         self.config = AppConfig.load()
 
@@ -58,17 +82,16 @@ class MainApp(App):
         self._select_project_action = SelectProject(self)
         self._select_workspace_action = SelectWorkspace(self, self._select_project_action)
 
-    # ---- acceso para las acciones ----
-
     def get_active_workspace(self):
+        """Return the workspace of the active session (may be ``None``)."""
         return self.active_session.workspace
 
     def get_active_project(self):
+        """Return the project of the active session (may be ``None``)."""
         return self.active_session.project
 
-    # ---- mutacion ----
-
-    def select_workspace(self, ws):
+    def select_workspace(self, ws) -> None:
+        """Set *ws* as the active workspace, clear the project and persist."""
         self.active_session.workspace = ws
         self.active_session.project = None
         self.config.set_active_workspace(ws.root_dir)
@@ -76,16 +99,16 @@ class MainApp(App):
         self._save_sessions()
         self._refresh_header()
 
-    def select_project(self, prj):
+    def select_project(self, prj) -> None:
+        """Set *prj* as the active project and persist."""
         self.active_session.workspace.set_active_project(prj.root_dir)
         self.active_session.project = prj
         self._update_tab_label(self.active_session)
         self._save_sessions()
         self._refresh_header()
 
-    # ---- persistencia de sesiones ----
-
     def _save_sessions(self) -> None:
+        """Serialise all sessions to the config and write to disk."""
         self.config.sessions = [
             {
                 "id": s.id,
@@ -97,25 +120,25 @@ class MainApp(App):
         self.config.active_session_index = self.sessions.index(self.active_session)
         self.config.save()
 
-    # ---- echo / log ----
-
-    def echo(self, result: Markdown | None):
+    def echo(self, result: Markdown | None) -> None:
+        """Append a :class:`Markdown` widget to the active chat and scroll down."""
         if result is not None:
             chat = self._active_chat()
             chat.mount(result)
             chat.scroll_end(animate=False)
 
     def _log(self, text: str) -> None:
+        """Convenience wrapper: mount a Markdown widget with *text*."""
         chat = self._active_chat()
         chat.mount(Markdown(text))
         chat.scroll_end(animate=False)
 
     def _active_chat(self) -> VerticalScroll:
+        """Return the chat scroll container for the active session."""
         return self.query_one(f"#chat-{self.active_session.id}", VerticalScroll)
 
-    # ---- lifecycle ----
-
     def on_mount(self) -> None:
+        """Restore workspace/project references for every session from config."""
         saved = self.config.sessions
         for i, session in enumerate(self.sessions):
             if i < len(saved):
@@ -151,6 +174,7 @@ class MainApp(App):
         self._refresh_header()
 
     def compose(self) -> ComposeResult:
+        """Build the widget tree: header, tabbed chat areas, input and footer."""
         yield Header()
         with Vertical():
             with TabbedContent(id="tabs"):
@@ -160,9 +184,8 @@ class MainApp(App):
             yield Input(placeholder="Escribe aqui... (Enter para enviar)", id="prompt")
             yield Footer()
 
-    # ---- tabs ----
-
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        """Update :attr:`active_session` and the header when the user switches tabs."""
         pane_id = event.pane.id or ""
         sid = pane_id.removeprefix("tab-")
         for s in self.sessions:
@@ -172,6 +195,7 @@ class MainApp(App):
         self._refresh_header()
 
     def _tab_label(self, session: Session) -> str:
+        """Derive a human-readable tab label: project > workspace > default."""
         if session.project:
             return session.project.name
         if session.workspace:
@@ -179,22 +203,25 @@ class MainApp(App):
         return "Nueva sesion"
 
     def _update_tab_label(self, session: Session) -> None:
+        """Refresh the displayed label of the tab for *session*."""
         tabs = self.query_one("#tabs", TabbedContent)
         tab = tabs.get_tab(f"tab-{session.id}")
         tab.label = self._tab_label(session)
 
-    # ---- actions ----
-
-    def action_select_project(self):
+    def action_select_project(self) -> None:
+        """Keybinding action: launch the project-selection flow."""
         self.run_worker(self._select_project_action.run())
 
-    def action_select_workspace(self):
+    def action_select_workspace(self) -> None:
+        """Keybinding action: launch the workspace-selection flow."""
         self.run_worker(self._select_workspace_action.run())
 
-    def action_new_session(self):
+    def action_new_session(self) -> None:
+        """Keybinding action: create a new empty session tab."""
         self.run_worker(self._new_session())
 
-    async def _new_session(self):
+    async def _new_session(self) -> None:
+        """Create a new session, add a tab for it and activate it."""
         session = Session()
         self.sessions.append(session)
 
@@ -210,10 +237,16 @@ class MainApp(App):
         self._save_sessions()
         self._refresh_header()
 
-    def action_close_session(self):
+    def action_close_session(self) -> None:
+        """Keybinding action: close the active session after confirmation."""
         self.run_worker(self._close_session())
 
-    async def _close_session(self):
+    async def _close_session(self) -> None:
+        """Ask for confirmation and close the active session.
+
+        When the last remaining session is closed a replacement session
+        inheriting the same workspace and project is created automatically.
+        """
         confirmed = await self.push_screen_wait(Confirm(
             title="Cerrar sesion",
             subtitle="Se cerrara la sesion actual y su tab.",
@@ -247,9 +280,8 @@ class MainApp(App):
         self._save_sessions()
         self._refresh_header()
 
-    # ---- input ----
-
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Append the user's message to the active chat when Enter is pressed."""
         if event.input.id != "prompt":
             return
         text = event.value.strip()
@@ -260,9 +292,8 @@ class MainApp(App):
         chat.scroll_end(animate=False)
         event.input.value = ""
 
-    # ---- header ----
-
     def _refresh_header(self) -> None:
+        """Update the application title bar with the active workspace and project."""
         ws = self.active_session.workspace
         prj = self.active_session.project
         ws_name = ws.name if ws else "Sin workspace"

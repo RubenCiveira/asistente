@@ -1,28 +1,29 @@
 # Asistente
 
-Multi-agent AI assistant framework built on LangChain. Routes user requests to
-specialized agents that plan, review and execute tasks using registered tools.
+Tabbed TUI assistant for managing workspaces, projects and interactive
+sessions.  Built on [Textual](https://textual.textualize.io/) with
+JSON-Schema-driven forms and filesystem browsing with autocomplete.
+
+> **Note:** Legacy multi-agent LangChain code lives under `src/old/` and is
+> not part of the active codebase.
 
 ## Features
 
-- **Router-based architecture** — a router agent analyses the user's intent and
-  delegates to the best specialist (code generation, documentation, tests, etc.).
-- **Plan → Review → Execute pipeline** — every action is planned by an agent,
-  validated by a review agent and only then executed.
-- **JSON-Schema-driven forms** — both the console (prompt_toolkit) and the TUI
-  (Textual) interfaces render forms dynamically from JSON Schema with
-  incremental validation.
-- **Tool registry** — tools are registered at runtime; built-in tools provide
-  sandboxed file-system read/write access.
-- **Cost tracking** — token usage and costs are logged per session in JSONL
-  format.
-- **i18n prompts** — agent prompts are stored as JSON files and resolved by
-  language at runtime.
+- **Multi-session tabs** — open several independent sessions, each bound to
+  its own workspace and project.  Sessions are persisted across restarts.
+- **Workspace / project model** — organise work into workspaces (directories
+  that group projects) and projects (directories with their own config).
+- **JSON-Schema-driven forms** — both the console (`prompt_toolkit`) and the
+  TUI (Textual) renderers build forms dynamically from JSON Schema (Draft
+  2020-12) with incremental cross-field validation.
+- **Path dialog with autocomplete** — browse the filesystem inside a modal
+  with type-ahead suggestions, filtering and validation constraints.
+- **Confirmation dialogs** — reusable yes/no modal for destructive actions.
 
 ## Requirements
 
 - Python >= 3.12
-- A running [Ollama](https://ollama.com) instance **or** an OpenAI API key.
+- A terminal that supports Textual (most modern terminals).
 
 ## Quick start
 
@@ -34,14 +35,8 @@ cd asistente
 # Install
 make build
 
-# Copy and edit environment variables
-cp .env.example .env        # add your OPENAI_API_KEY or configure Ollama
-
 # Run the TUI
-python window.py
-
-# Run the console form demo
-python main.py -p . -i "hello"
+PYTHONPATH=src python src/window.py
 ```
 
 ## Makefile targets
@@ -58,40 +53,35 @@ python main.py -p . -i "hello"
 
 ```
 asistente/
-├── agent.py              # Single-shot CLI entry point
-├── main.py               # Interactive console mode
-├── window.py             # Textual TUI entry point
-├── app/
-│   ├── core/
-│   │   ├── base_agent.py     # Abstract agent base class
-│   │   ├── runtime.py        # Orchestration engine
-│   │   ├── registry.py       # Tool / agent registry
-│   │   ├── types.py          # Shared data classes
-│   │   ├── tracer.py         # Rich console logger
-│   │   ├── costs_store.py    # JSONL cost tracker
-│   │   ├── work_lock.py      # File-based mutex
-│   │   └── llm_usage.py      # OpenAI callback wrapper
-│   ├── agents/               # Agent implementations (auto-discovered)
-│   │   ├── router_agent.py
-│   │   ├── review_agent.py
-│   │   ├── generic_agent.py
-│   │   ├── code_agent.py
-│   │   ├── code_test_agent.py
-│   │   ├── docs_agent.py
-│   │   ├── docs_uml_agent.py
-│   │   └── generic_wiki_agent.py
-│   ├── tools/
-│   │   ├── fs_read.py        # Sandboxed file read
-│   │   └── fs_write.py       # Sandboxed file write
-│   ├── ui/
-│   │   ├── console/
-│   │   │   └── form.py       # Console JSON-Schema form
-│   │   └── textual/
-│   │       └── form.py       # Textual TUI JSON-Schema form dialog
-├── tests/                    # Test suite
+├── src/
+│   ├── window.py                          # Textual TUI entry point
+│   └── app/
+│       ├── config.py                      # Application config (JSON persistence)
+│       ├── context/
+│       │   ├── project.py                 # Project metadata dataclass
+│       │   ├── session.py                 # Session (UUID, workspace, project refs)
+│       │   └── workspace.py               # Workspace manifest dataclass
+│       └── ui/
+│           ├── console/
+│           │   └── form.py                # Console JSON-Schema form renderer
+│           └── textual/
+│               ├── confirm.py             # Yes/no modal dialog
+│               ├── form.py                # Wizard-style JSON-Schema form dialog
+│               ├── path_dialog.py         # File/directory browser with autocomplete
+│               └── action/
+│                   ├── select_project.py   # Action: pick or create a project
+│                   ├── select_workspace.py # Action: pick or create a workspace
+│                   └── test/
+│                       ├── test_form.py    # Manual TUI smoke test for FormDialog
+│                       └── test_path.py    # Manual TUI smoke test for PathDialog
+├── test/                                   # pytest test suite
+│   └── test_textual_form.py
+├── docs/                                   # Technical and user documentation
+├── Makefile
 ├── requirements.txt
 ├── requirements.lock.txt
-└── Makefile
+├── CONTRIBUTING.md
+└── LICENSE
 ```
 
 ## License

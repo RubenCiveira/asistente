@@ -1,3 +1,10 @@
+"""Manual TUI smoke test for FormDialog.
+
+This is **not** a pytest test.  It is an interactive action class that can
+be wired into the running TUI to exercise :class:`FormDialog` with a
+complex JSON Schema including cross-field validation.
+"""
+
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
@@ -11,11 +18,19 @@ from app.ui.textual.path_dialog import PathDialog
 
 from app.config import AppConfig, default_workspaces_dir
 
+
 class TestForm:
+    """Interactive demo action that opens a :class:`FormDialog` with a rich schema.
+
+    Args:
+        window: The main application instance.
+    """
+
     def __init__(self, window: App):
         self.window = window
 
     async def run(self):
+        """Show a FormDialog with a comprehensive test schema and echo the result."""
         schema = {
             "type": "object",
             "properties": {

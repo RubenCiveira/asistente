@@ -12,7 +12,7 @@ from textual.containers import Vertical, Horizontal, VerticalScroll
 from textual import work
 
 from pathlib import Path
-from app.ui.textual.widgets.form import FormDialog
+from app.ui.textual.widgets.wizard_from_schema import WizardFromSchema
 from app.ui.textual.widgets.path_dialog import PathDialog
 
 from app.config import AppConfig, default_workspaces_dir

@@ -29,16 +29,16 @@ from app.context.session import Session
 from app.context.keywords import Keywords
 
 from app.ui.textual.widgets.confirm import Confirm
-from app.ui.textual.widgets.chat_input import ChatInput
+from app.ui.textual.chat_input import ChatInput
 from app.ui.textual.action.select_project import SelectProject
 from app.ui.textual.action.select_workspace import SelectWorkspace
 from app.ui.textual.action.test.test_config import TestConfig
-from app.ui.textual.widgets.app_config_dialog import AppConfigDialog
-from app.ui.textual.config_provider.rag_config_provider import RagConfigProvider
+from app.ui.textual.app_config_dialog import AppConfigDialog
 from app.ui.textual.completion_provider.slash_provider import SlashCommandProvider
 from app.ui.textual.completion_provider.at_provider import ContextProvider
 from app.ui.textual.completion_provider.colon_provider import PowerCommandProvider
 from app.ui.textual.completion_provider.hash_provider import SemanticProvider
+# from app.ui.textual.config_provider.rag_config_provider import RagConfigProvider
 
 class MainApp(App):
     """Tabbed multi-session Textual application.

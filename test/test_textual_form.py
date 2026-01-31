@@ -1,12 +1,14 @@
-"""Tests for :mod:`app.textual.form` — FormDialog."""
+"""Tests for :mod:`app.textual.wizard_from_schema` — WizardFromSchema."""
 
 from __future__ import annotations
 
 import pytest
+from typing import Any, Dict, cast
+
 from textual.app import App, ComposeResult
 from textual.widgets import Button, Input, ListView, Static
 
-from app.ui.textual.widgets.form import FormDialog
+from app.ui.textual.widgets.wizard_from_schema import WizardFromSchema
 
 
 # ----------------------------------------------------------------
@@ -92,7 +94,7 @@ def _default_schema():
 
 
 class FormApp(App):
-    """Thin app wrapper used to push a FormDialog in tests."""
+    """Thin app wrapper used to push a WizardFromSchema in tests."""
 
     RESULT = "_UNSET"
 
@@ -107,7 +109,7 @@ class FormApp(App):
 
     def on_mount(self) -> None:
         self.push_screen(
-            FormDialog(self._schema, self._initial),
+            WizardFromSchema(self._schema, self._initial),
             callback=self._on_result,
         )
 
@@ -121,10 +123,10 @@ class FormApp(App):
 # ----------------------------------------------------------------
 
 class TestCastValue:
-    """Tests for FormDialog._cast_value (no UI needed)."""
+    """Tests for WizardFromSchema._cast_value (no UI needed)."""
 
     def _make(self):
-        return FormDialog({"type": "object", "properties": {"x": {"type": "string"}}})
+        return WizardFromSchema({"type": "object", "properties": {"x": {"type": "string"}}})
 
     def test_string(self):
         assert self._make()._cast_value("hello", "string") == "hello"
@@ -162,7 +164,7 @@ class TestCastValue:
 
 class TestGetInitialValue:
     def test_data_takes_precedence(self):
-        fd = FormDialog(
+        fd = WizardFromSchema(
             {"type": "object", "properties": {"x": {"type": "string", "default": "d"}}},
             initial_values={"x": "init"},
         )
@@ -170,7 +172,7 @@ class TestGetInitialValue:
         assert fd._get_initial_value("x") == "submitted"
 
     def test_initial_values_over_default(self):
-        fd = FormDialog(
+        fd = WizardFromSchema(
             {"type": "object", "properties": {"x": {"type": "string", "default": "d"}}},
             initial_values={"x": "init"},
         )
@@ -178,13 +180,13 @@ class TestGetInitialValue:
         assert fd._get_initial_value("x") == "init"
 
     def test_falls_back_to_default(self):
-        fd = FormDialog(
+        fd = WizardFromSchema(
             {"type": "object", "properties": {"x": {"type": "string", "default": "d"}}},
         )
         assert fd._get_initial_value("x") == "d"
 
     def test_none_when_nothing(self):
-        fd = FormDialog(
+        fd = WizardFromSchema(
             {"type": "object", "properties": {"x": {"type": "string"}}},
         )
         assert fd._get_initial_value("x") is None
@@ -196,17 +198,17 @@ class TestGetInitialValue:
 
 class TestValidateFieldIncremental:
     def test_valid_value(self):
-        fd = FormDialog(_simple_schema())
+        fd = WizardFromSchema(_simple_schema())
         errors = fd._validate_field_incremental("name", "Alice")
         assert errors == []
 
     def test_minimum_constraint(self):
-        fd = FormDialog(_integer_schema())
+        fd = WizardFromSchema(_integer_schema())
         errors = fd._validate_field_incremental("count", 0)
         assert len(errors) > 0
 
     def test_valid_integer(self):
-        fd = FormDialog(_integer_schema())
+        fd = WizardFromSchema(_integer_schema())
         errors = fd._validate_field_incremental("count", 5)
         assert errors == []
 
@@ -227,7 +229,7 @@ class TestValidateFieldIncremental:
                 }
             ],
         }
-        fd = FormDialog(schema)
+        fd = WizardFromSchema(schema)
         fd.data["private"] = True
         # token not provided yet — should fail when we reach token field
         errors = fd._validate_field_incremental("token", None)
@@ -243,7 +245,7 @@ class TestValidateFieldIncremental:
 
 class TestIsFreeTextArray:
     def test_string_field(self):
-        fd = FormDialog(_simple_schema())
+        fd = WizardFromSchema(_simple_schema())
         assert fd._is_free_text_array() is False
 
     def test_array_with_enum(self):
@@ -256,11 +258,11 @@ class TestIsFreeTextArray:
                 },
             },
         }
-        fd = FormDialog(schema)
+        fd = WizardFromSchema(schema)
         assert fd._is_free_text_array() is False
 
     def test_free_text_array(self):
-        fd = FormDialog(_array_schema())
+        fd = WizardFromSchema(_array_schema())
         assert fd._is_free_text_array() is True
 
 
@@ -270,16 +272,16 @@ class TestIsFreeTextArray:
 
 class TestConstructor:
     def test_field_order(self):
-        fd = FormDialog(_two_field_schema())
+        fd = WizardFromSchema(_two_field_schema())
         assert fd.field_order == ["first", "second"]
 
     def test_required(self):
-        fd = FormDialog(_two_field_schema())
+        fd = WizardFromSchema(_two_field_schema())
         assert fd.required == {"first"}
 
     def test_initial_values_copied(self):
         init = {"first": "hello"}
-        fd = FormDialog(_two_field_schema(), initial_values=init)
+        fd = WizardFromSchema(_two_field_schema(), initial_values=init)
         assert fd._initial_values == {"first": "hello"}
         assert fd.data == {"first": "hello"}
         # Mutating the original dict must not affect the form
@@ -287,7 +289,7 @@ class TestConstructor:
         assert fd._initial_values["first"] == "hello"
 
     def test_no_initial_values(self):
-        fd = FormDialog(_simple_schema())
+        fd = WizardFromSchema(_simple_schema())
         assert fd._initial_values == {}
         assert fd.data == {}
 
@@ -296,7 +298,7 @@ class TestConstructor:
 # Async / Textual integration tests
 # ----------------------------------------------------------------
 
-class TestFormDialogAsync:
+class TestWizardFromSchemaAsync:
     """Tests that run the Textual app to exercise the full UI."""
 
     @pytest.mark.asyncio
@@ -327,7 +329,7 @@ class TestFormDialogAsync:
         app = FormApp(_simple_schema(), initial_values={"name": "pre"})
         async with app.run_test() as pilot:
             await pilot.pause()
-            # The active screen IS the FormDialog
+            # The active screen IS the WizardFromSchema
             dialog = app.screen
             inp = dialog.query_one(Input)
             assert inp.value == "pre"
@@ -355,6 +357,7 @@ class TestFormDialogAsync:
             # Second field (optional) — skip via enter on empty input
             await pilot.press("enter")
         assert FormApp.RESULT is not None
+        assert isinstance(FormApp.RESULT, dict)
         assert FormApp.RESULT.get("first") == "a"
 
     @pytest.mark.asyncio
@@ -368,7 +371,7 @@ class TestFormDialogAsync:
             await pilot.click("#back")
             await pilot.pause()
             # Should be back on first field
-            dialog = app.screen
+            dialog = cast(WizardFromSchema, app.screen)
             assert dialog.index == 0
 
     @pytest.mark.asyncio
@@ -376,7 +379,7 @@ class TestFormDialogAsync:
         app = FormApp(_integer_schema())
         async with app.run_test() as pilot:
             await pilot.pause()
-            dialog = app.screen
+            dialog = cast(WizardFromSchema, app.screen)
             inp = dialog.query_one(Input)
             inp.value = "0"
             await pilot.click("#next")
@@ -389,7 +392,7 @@ class TestFormDialogAsync:
         app = FormApp(_array_schema())
         async with app.run_test() as pilot:
             await pilot.pause()
-            dialog = app.screen
+            dialog = cast(WizardFromSchema, app.screen)
             inp = dialog.query_one("#array-input", Input)
             inp.value = "tag1"
             await pilot.press("enter")
@@ -404,7 +407,7 @@ class TestFormDialogAsync:
         app = FormApp(_array_schema(), initial_values={"tags": ["a", "b"]})
         async with app.run_test() as pilot:
             await pilot.pause()
-            dialog = app.screen
+            dialog = cast(WizardFromSchema, app.screen)
             lv = dialog.query_one("#array-items", ListView)
             assert len(lv.children) == 2
             assert dialog._array_values == ["a", "b"]

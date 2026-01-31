@@ -20,7 +20,7 @@ from textual.message import Message
 
 from textual_autocomplete import AutoComplete, DropdownItem
 from textual_autocomplete._autocomplete import TargetState
-from app.ui.textual.widgets.token_aware_auto_complete import TokenAwareAutoComplete
+from app.ui.textual.token_aware_auto_complete import TokenAwareAutoComplete
 
 from app.context.keywords import Keywords
 

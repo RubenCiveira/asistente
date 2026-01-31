@@ -16,8 +16,8 @@ from typing import Dict, List, Optional
 from textual.containers import VerticalScroll
 from textual.widgets import Static, Tree
 
+from app.ui.textual.config_provider import ConfigProvider
 from app.ui.textual.widgets.config_dialog import ConfigDialog, ConfigValues
-from app.ui.textual.widgets.config_provider import ConfigProvider
 
 
 class AppConfigDialog(ConfigDialog):

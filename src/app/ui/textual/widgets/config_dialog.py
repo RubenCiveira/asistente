@@ -66,7 +66,7 @@ from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static, Tree
 
-from .form import SchemaForm
+from .form_from_schema import FormFromSchema
 
 
 @dataclass
@@ -246,7 +246,7 @@ class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
         # Parent mapping: page_id -> parent_page_id (None for roots)
         self._parent_map: Dict[str, Optional[str]] = {}
         self._current_page: Optional[ConfigPage] = None
-        self._form: Optional[SchemaForm] = None
+        self._form: Optional[FormFromSchema] = None
 
         self._index_pages(self._pages, None)
         self._load_initial_values()
@@ -351,7 +351,7 @@ class ConfigDialog(ModalScreen[Optional[Dict[str, ConfigValues]]]):
         self.query_one("#config-errors", Static).update("")
 
         stored = self._page_values.get(page.id, {})
-        self._form = SchemaForm(
+        self._form = FormFromSchema(
             page.schema,
             initial_values=stored,
             id_prefix=f"cfg-{page.id}",

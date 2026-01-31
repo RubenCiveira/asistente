@@ -11,7 +11,7 @@ from app.config import AppConfig, PostgresRagConfig, Topic
 from app.context.workspace import Workspace
 from app.context.project import Project
 from app.ui.textual.widgets.config_dialog import ConfigValues
-from app.ui.textual.config_provider.rag_config_provider import RagConfigProvider, _topic_selection_schema
+from app.ui.textual.rag_config_provider import RagConfigProvider, _topic_selection_schema
 
 
 # ── Stub window ──────────────────────────────────────────────────────

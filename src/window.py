@@ -28,6 +28,7 @@ from app.context.project import Project
 from app.context.session import Session
 from app.context.keywords import Keywords
 
+
 from app.ui.textual.widgets.confirm import Confirm
 from app.ui.textual.chat_input import ChatInput
 from app.ui.textual.action.select_project import SelectProject
@@ -90,6 +91,9 @@ class MainApp(App):
             ]
         else:
             self.sessions = [Session()]
+
+        for session in self.sessions:
+            self._bind_session(session)
 
         idx = max(0, min(self.config.active_session_index, len(self.sessions) - 1))
         self.active_session = self.sessions[idx]
@@ -227,6 +231,7 @@ class MainApp(App):
             if s.id == sid:
                 self.active_session = s
                 break
+        self._render_session(self.active_session)
         self._refresh_header()
 
     def _tab_label(self, session: Session) -> str:
@@ -245,10 +250,7 @@ class MainApp(App):
 
     def action_clear_text(self) -> None:
         """Keybinding action: clear all messages from the active chat area."""
-        chat = self._active_chat()
-        chat.remove_children()
-        chat.refresh(layout=True)
-        chat.scroll_end(animate=False)
+        self.active_session.clear()
 
     def action_select_project(self) -> None:
         """Keybinding action: launch the project-selection flow."""
@@ -278,6 +280,7 @@ class MainApp(App):
     async def _new_session(self) -> None:
         """Create a new session, add a tab for it and activate it."""
         session = Session()
+        self._bind_session(session)
         self.sessions.append(session)
 
         tabs = self.query_one("#tabs", TabbedContent)
@@ -316,6 +319,7 @@ class MainApp(App):
 
         if was_last:
             new_session = Session()
+            self._bind_session(new_session)
             new_session.workspace = closing.workspace
             new_session.project = closing.project
             self.sessions.append(new_session)
@@ -326,6 +330,7 @@ class MainApp(App):
             pane_widget = self.query_one(f"#tab-{new_session.id}", TabPane)
             await pane_widget.mount(VerticalScroll(id=f"chat-{new_session.id}", classes="session-chat"))
 
+        closing.unsubscribe(self._on_session_change)
         self.sessions.remove(closing)
         self.active_session = self.sessions[0]
 
@@ -342,10 +347,37 @@ class MainApp(App):
         text = event.value.strip()
         if not text:
             return
-        chat = self._active_chat()
-        chat.mount(Markdown(f"**user>** {text}"))
-        chat.scroll_end(animate=False)
         event.input.value = ""
+        self.run_worker(self._ask_session(text))
+
+    async def _ask_session(self, text: str):
+        result = await self.active_session.ask(text)
+        if result is None:
+            return
+        self.run_worker(self._ask_callback(result.callback))
+
+    async def _ask_callback(self, callback):
+        result = await callback()
+        if result is None:
+            return
+        self.run_worker(self._ask_callback(result.callback))
+
+    def _bind_session(self, session: Session) -> None:
+        session.subscribe(self._on_session_change)
+
+    def _on_session_change(self, session: Session) -> None:
+        self._render_session( session )
+
+    def _render_session(self, session: Session) -> None:
+        if session != self.active_session:
+            return
+        chat = self._active_chat()
+        chat.remove_children()
+        for message in session.messages:
+            chat.mount(Markdown(f"**{message.actor}>** {message.msg}"))
+        if session.asking:
+            chat.mount(Markdown("**assistant>** ..."))
+        chat.scroll_end(animate=False)
 
     def _refresh_header(self) -> None:
         """Update the application title bar with the active workspace and project."""

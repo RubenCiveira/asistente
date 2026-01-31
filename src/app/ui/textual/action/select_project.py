@@ -12,7 +12,7 @@ from textual.widgets import Markdown
 from pathlib import Path
 
 from app.ui.textual.widgets.path_dialog import PathDialog
-from app.ui.textual.widgets.form import FormDialog
+from app.ui.textual.widgets.wizard_from_schema import WizardFromSchema
 from app.ui.textual.widgets.confirm import Confirm
 from app.context.project import Project
 
@@ -75,7 +75,7 @@ class SelectProject:
                 },
                 "required": ["project"],
             }
-            result = await self.window.push_screen_wait(FormDialog(schema))
+            result = await self.window.push_screen_wait(WizardFromSchema(schema))
             if result is None:
                 return None
             chosen = result["project"]

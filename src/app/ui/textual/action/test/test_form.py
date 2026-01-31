@@ -1,11 +1,13 @@
-"""Manual TUI smoke test for FormDialog.
+"""Manual TUI smoke test for WizardFromSchema.
 
 This is **not** a pytest test.  It is an interactive action class that can
-be wired into the running TUI to exercise :class:`FormDialog` with a
+be wired into the running TUI to exercise :class:`WizardFromSchema` with a
 complex JSON Schema including cross-field validation.
 """
 
 from __future__ import annotations
+
+from typing import Any, cast
 
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, Static, Button, Markdown
@@ -13,14 +15,14 @@ from textual.containers import Vertical, Horizontal, VerticalScroll
 from textual import work
 
 from pathlib import Path
-from app.ui.textual.widgets.form import FormDialog
+from app.ui.textual.widgets.wizard_from_schema import WizardFromSchema
 from app.ui.textual.widgets.path_dialog import PathDialog
 
 from app.config import AppConfig, default_workspaces_dir
 
 
 class TestForm:
-    """Interactive demo action that opens a :class:`FormDialog` with a rich schema.
+    """Interactive demo action that opens a :class:`WizardFromSchema` with a rich schema.
 
     Args:
         window: The main application instance.
@@ -30,7 +32,7 @@ class TestForm:
         self.window = window
 
     async def run(self):
-        """Show a FormDialog with a comprehensive test schema and echo the result."""
+        """Show a WizardFromSchema with a comprehensive test schema and echo the result."""
         schema = {
             "type": "object",
             "properties": {
@@ -165,9 +167,10 @@ class TestForm:
             "depth": 3,
         }
 
-        result = await self.window.push_screen_wait(FormDialog(schema, initial_values))
+        result = await self.window.push_screen_wait(WizardFromSchema(schema, initial_values))
         
+        window = cast(Any, self.window)
         if result is None:
-            self.window.echo(  Markdown("Formulario cancelado.") )
+            window.echo(Markdown("Formulario cancelado."))
         else:
-            self.window.echo(  Markdown(str(result)) )
+            window.echo(Markdown(str(result)))

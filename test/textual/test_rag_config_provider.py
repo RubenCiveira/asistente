@@ -117,7 +117,10 @@ class TestConfigValues:
         cv = provider.config_values()
 
         entries = cv.childs["topics"].values["entries"]
-        assert entries == ["docs:/data/docs", "code:/src"]
+        assert entries == [
+            {"name": "docs", "path": "/data/docs"},
+            {"name": "code", "path": "/src"},
+        ]
 
     def test_reads_workspace_topics(self, tmp_path):
         cfg = AppConfig(config_path=tmp_path / "c.json")
@@ -214,7 +217,12 @@ class TestSaveConfig:
         cfg = AppConfig(config_path=tmp_path / "c.json")
         provider = RagConfigProvider(StubWindow(cfg))
 
-        values = self._make_values(entries=["docs:/data/docs", "code:/src/code"])
+        values = self._make_values(
+            entries=[
+                {"name": "docs", "path": "/data/docs"},
+                {"name": "code", "path": "/src/code"},
+            ]
+        )
         provider.save_config(values)
 
         assert len(cfg.topics) == 2
@@ -228,7 +236,7 @@ class TestSaveConfig:
         cfg = AppConfig(config_path=tmp_path / "c.json")
         provider = RagConfigProvider(StubWindow(cfg))
 
-        values = self._make_values(entries=["orphan"])
+        values = self._make_values(entries=[{"name": "orphan", "path": ""}])
         provider.save_config(values)
 
         assert len(cfg.topics) == 1
@@ -239,7 +247,13 @@ class TestSaveConfig:
         cfg = AppConfig(config_path=tmp_path / "c.json")
         provider = RagConfigProvider(StubWindow(cfg))
 
-        values = self._make_values(entries=["good:/path", ":/bad", ""])
+        values = self._make_values(
+            entries=[
+                {"name": "good", "path": "/path"},
+                {"name": "", "path": "/bad"},
+                {"name": "", "path": ""},
+            ]
+        )
         provider.save_config(values)
 
         assert len(cfg.topics) == 1
@@ -251,7 +265,10 @@ class TestSaveConfig:
         provider = RagConfigProvider(StubWindow(cfg, workspace=ws))
 
         values = self._make_values(
-            entries=["docs:/docs", "code:/code"],
+            entries=[
+                {"name": "docs", "path": "/docs"},
+                {"name": "code", "path": "/code"},
+            ],
             ws_topics=["docs", "code", "stale"],
         )
         provider.save_config(values)
@@ -267,7 +284,7 @@ class TestSaveConfig:
         provider = RagConfigProvider(StubWindow(cfg, project=prj))
 
         values = self._make_values(
-            entries=["docs:/docs"],
+            entries=[{"name": "docs", "path": "/docs"}],
             prj_topics=["docs", "removed"],
         )
         provider.save_config(values)

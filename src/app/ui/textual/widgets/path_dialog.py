@@ -16,8 +16,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Static, Button
 from textual.containers import Vertical, Horizontal
 
-from textual_autocomplete import AutoComplete, DropdownItem
-from textual_autocomplete._autocomplete import TargetState  # callback state (v4)
+from .path_field import PathField
 
 
 class PathDialog(ModalScreen[Optional[Path]]):
@@ -122,28 +121,29 @@ class PathDialog(ModalScreen[Optional[Path]]):
         self.title = title
         self.sub_title = sub_title
         self.max_suggestions = max_suggestions
+        self._path_field: PathField | None = None
 
     def compose(self):
         """Build the dialog widget tree with input, autocomplete and buttons."""
-        if self.initial_path:
-            resolved = self.initial_path.expanduser().resolve()
-            initial = "/" + str(resolved.relative_to(self.root_dir))
-        else:
-            initial = ""
-
-        input_widget = Input(
+        self._path_field = PathField(
+            root_dir=self.root_dir,
+            must_exist=self.must_exist,
+            warn_if_exists=self.warn_if_exists,
+            select=self.select,
+            initial_path=self.initial_path,
+            name_filter=self.name_filter.pattern if self.name_filter else None,
+            relative_check_path=self.relative_check_path,
+            max_suggestions=self.max_suggestions,
             placeholder=str(self.root_dir),
-            value=initial,
-            id="path_input",
+            input_id="path_input",
+            autocomplete_id="ac",
         )
 
         yield Vertical(
-            Static(self.title, id="title"),
-            Static(f"[i]{self.sub_title}[/i]", id="subtitle"),
-            input_widget,
+            Static(str(self.title or ""), id="title"),
+            Static(f"[i]{self.sub_title or ''}[/i]", id="subtitle"),
+            self._path_field,
             Static(f"[i]Root: {self.root_dir}[/i]", id="root_label"),
-            # AutoComplete se monta aparte y apunta al Input como target (v4)
-            AutoComplete(target=input_widget, candidates=self._candidates, id="ac"),
             Static("", id="error"),
             Horizontal(
                 Button("Cancel", id="btn_cancel"),
@@ -155,7 +155,8 @@ class PathDialog(ModalScreen[Optional[Path]]):
 
     def on_mount(self) -> None:
         """Focus the path input on mount."""
-        self.query_one("#path_input", Input).focus()
+        if self._path_field is not None:
+            self._path_field.focus_input()
 
     # ---------- Actions / Buttons ----------
 
@@ -175,90 +176,13 @@ class PathDialog(ModalScreen[Optional[Path]]):
         if event.input.id == "path_input":
             self._try_accept()
 
-    # ---------- AutoComplete callback (v4) ----------
-
-    def _candidates(self, state):
-        """Return autocomplete suggestions for the current input text.
-
-        Lists entries under the resolved directory, filtering by name,
-        type and visibility constraints.
-
-        Args:
-            state: Autocomplete target state containing the current text.
-
-        Returns:
-            A list of :class:`DropdownItem` suggestions.
-        """
-        text = state.text or ""
-
-        try:
-            # "/" significa listar root
-            rel = text.lstrip("/")
-            base = (self.root_dir / rel).resolve(strict=False)
-            if not base.is_relative_to(self.root_dir):
-                return []
-            ends_with_slash = text.endswith("/")
-            if rel == ".":
-                parent = self.root_dir
-                prefix = "."
-            elif rel == "/":
-                parent = self.root_dir
-                prefix = ""
-            elif ends_with_slash:
-                parent = base
-                prefix = ""
-            else:
-                parent = base.parent
-                prefix = base.name
-
-            if not parent.exists() or not parent.is_dir():
-                return []
-
-            items = []
-
-            entries = sorted(
-                parent.iterdir(),
-                key=lambda p: (p.is_file(), p.name.lower())
-            )
-            for p in entries:
-                p_abs = p.resolve(strict=False)
-                if not (p_abs == self.root_dir or p_abs.is_relative_to(self.root_dir)):
-                    continue
-                if self.name_filter and not self.name_filter.match(p.name):
-                    continue
-                if rel != "." and p.name.startswith("."):
-                    continue
-
-                if prefix and not p.name.startswith(prefix):
-                    continue
-
-                if self.select == "dir" and p.is_file():
-                    continue
-
-                # 🔑 mostrar RELATIVO
-                rel_path = p.relative_to(self.root_dir)
-
-                items.append(
-                    DropdownItem(
-                        main="/" + str(rel_path),
-                        prefix="📁 " if p.is_dir() else "📄 ",
-                    )
-                )
-
-                if len(items) >= self.max_suggestions:
-                    break
-            return items
-
-        except Exception:
-            raise
-            return []
-
-
     # ---------- Validation / Accept ----------
 
     def _try_accept(self) -> None:
         """Read the input value, validate it and dismiss if valid."""
-        raw = self.query_one("#path_input", Input).value
+        if self._path_field is None:
+            return
+        raw = self._path_field.get_value()
         path = self._validate(raw)
         if path is not None:
             self.dismiss(path)

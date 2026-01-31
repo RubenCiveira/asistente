@@ -11,14 +11,46 @@ dismissing).
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
+
 
 from textual.containers import VerticalScroll
 from textual.widgets import Static, Tree
 
-from app.ui.textual.widgets.config_dialog import ConfigDialog, ConfigValues
-from app.ui.textual.widgets.config_provider import ConfigProvider
+from app.ui.textual.widgets.config_dialog import ConfigPage, ConfigDialog, ConfigValues
 
+class ConfigProvider(ABC):
+    """Abstract base class for configuration page providers.
+
+    Implementors supply a page definition and its initial values, and handle
+    persistence when the dialog is applied or accepted.
+    """
+
+    @abstractmethod
+    def config_page(self) -> ConfigPage:
+        """Return the configuration page for this provider."""
+        ...
+
+    def config_values(self) -> ConfigValues:
+        """Return initial values for this provider's page.
+
+        Override to pre-populate form fields with current settings.  The
+        default implementation returns empty values.
+        """
+        return ConfigValues()
+
+    @abstractmethod
+    def save_config(self, values: Dict[str, ConfigValues]) -> None:
+        """Persist configuration changes.
+
+        Called with the *entire* configuration dictionary (all providers'
+        pages) when the user clicks Apply or Accept.
+
+        Args:
+            values: Mapping of page id to :class:`ConfigValues`.
+        """
+        ...
 
 class AppConfigDialog(ConfigDialog):
     """Configuration dialog assembled from :class:`ConfigProvider` instances.

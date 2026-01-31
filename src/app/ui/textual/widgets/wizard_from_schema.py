@@ -86,7 +86,7 @@ class WizardFromSchema(ModalScreen[Optional[Dict[str, Any]]]):
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
             yield Static("Formulario", id="title")
-            yield Static("", id="field")
+            yield Vertical(id="field")
             yield Static("", id="errors")
             with Horizontal():
                 yield Button("Cancel", id="back", variant="error")
@@ -138,7 +138,7 @@ class WizardFromSchema(ModalScreen[Optional[Dict[str, Any]]]):
             self._go_back()
 
     def _render_field(self):
-        container = self.query_one("#field", Static)
+        container = self.query_one("#field", Vertical)
         container.remove_children()
         self.query_one("#errors", Static).update("")
 

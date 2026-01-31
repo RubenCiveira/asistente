@@ -234,6 +234,15 @@ class FieldFromSchema(Vertical):
             return
         self.run_worker(self.add_to_array)
 
+    def focus_first(self) -> None:
+        for widget_type in (Input, SelectionList, RadioSet, Checkbox, Button):
+            try:
+                widget = self.query_one(widget_type)
+            except Exception:
+                continue
+            widget.focus()
+            return
+
     def on_key(self, event) -> None:
         if self._list_view is None:
             return

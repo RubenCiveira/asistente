@@ -94,6 +94,7 @@ class WizardFromSchema(ModalScreen[Optional[Dict[str, Any]]]):
 
     def on_mount(self) -> None:
         self._render_field()
+        self.call_after_refresh(self._focus_current)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
@@ -156,6 +157,7 @@ class WizardFromSchema(ModalScreen[Optional[Dict[str, Any]]]):
             object_array_mode="modal",
         )
         container.mount(self.current_field)
+        self.call_after_refresh(self._focus_current)
 
         back_btn = self.query_one("#back", Button)
         if self.index == 0:
@@ -212,6 +214,11 @@ class WizardFromSchema(ModalScreen[Optional[Dict[str, Any]]]):
             return
 
         self._render_field()
+
+    def _focus_current(self) -> None:
+        if self.current_field is None:
+            return
+        self.current_field.focus_first()
 
     def _validate_field_incremental(self, field_name: str, candidate_value: Any) -> List[str]:
         idx = self.field_order.index(field_name)

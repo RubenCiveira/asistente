@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from jsonschema import Draft202012Validator
@@ -18,6 +19,8 @@ from textual.widgets import (
     SelectionList,
     Static,
 )
+
+from .path_field import PathField
 
 
 class FieldFromSchema(Vertical):
@@ -58,6 +61,28 @@ class FieldFromSchema(Vertical):
         self._label = Static(label_text, classes=self._label_class())
 
         spec = self._spec
+        if spec.get("type") == "string" and spec.get("format") == "directory":
+            root_dir = None
+            if isinstance(spec.get("x-root-dir"), str) and spec.get("x-root-dir"):
+                root_dir = self._path_root(spec)
+            self._widget = PathField(
+                root_dir=root_dir,
+                must_exist=spec.get("x-must-exist", True),
+                warn_if_exists=spec.get("x-warn-if-exists", False),
+                select="dir",
+                initial_path=self._path_initial(),
+                name_filter=spec.get("x-name-filter"),
+                relative_check_path=self._path_relative_check(spec),
+                max_suggestions=spec.get("x-max-suggestions", 30),
+                placeholder=str(root_dir),
+                input_id=self._input_id(),
+                autocomplete_id=f"{self._base_id()}--ac",
+            )
+            if self._include_input_label():
+                self.mount(self._label, self._widget)
+            else:
+                self.mount(self._widget)
+            return
         if "oneOf" in spec:
             buttons = []
             for opt in spec["oneOf"]:
@@ -180,6 +205,9 @@ class FieldFromSchema(Vertical):
         if self._spec.get("type") == "array":
             return list(self._array_values)
 
+        if isinstance(self._widget, PathField):
+            return self._widget.get_value()
+
         if isinstance(self._widget, SelectionList):
             return list(self._widget.selected)
 
@@ -235,6 +263,9 @@ class FieldFromSchema(Vertical):
         self.run_worker(self.add_to_array)
 
     def focus_first(self) -> None:
+        if isinstance(self._widget, PathField):
+            self._widget.focus_input()
+            return
         for widget_type in (Input, SelectionList, RadioSet, Checkbox, Button):
             try:
                 widget = self.query_one(widget_type)
@@ -367,6 +398,26 @@ class FieldFromSchema(Vertical):
 
     def _selection_id(self) -> str:
         return "array-selection" if self._mode == "wizard" else self._base_id()
+
+    def _path_root(self, spec: Dict[str, Any]) -> Path:
+        root = spec.get("x-root-dir")
+        if isinstance(root, str) and root:
+            return Path(root).expanduser().resolve()
+        return Path.home()
+
+    def _path_initial(self) -> Path | None:
+        initial = self._spec.get("x-initial-dir")
+        if isinstance(initial, str) and initial:
+            return Path(initial).expanduser()
+        if self._initial_value is not None:
+            return Path(str(self._initial_value)).expanduser()
+        return Path.home()
+
+    def _path_relative_check(self, spec: Dict[str, Any]) -> Path | None:
+        rel = spec.get("x-relative-check-path")
+        if isinstance(rel, str) and rel:
+            return Path(rel)
+        return None
 
     @staticmethod
     def _build_label(name: str, spec: Dict[str, Any], required: bool) -> str:

@@ -99,6 +99,7 @@ class RagConfigProvider(ConfigProvider):
                                         },
                                         "path": {
                                             "type": "string",
+                                            "format": "directory",
                                             "description": "Path",
                                         },
                                     },

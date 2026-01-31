@@ -20,7 +20,7 @@ class PathField(Vertical):
     def __init__(
         self,
         *,
-        root_dir: Path,
+        root_dir: Path | None = None,
         must_exist: bool = True,
         warn_if_exists: bool = False,
         select: str = "any",
@@ -33,7 +33,7 @@ class PathField(Vertical):
         autocomplete_id: str = "ac",
     ) -> None:
         super().__init__()
-        self.root_dir = root_dir.expanduser().resolve()
+        self.root_dir = root_dir.expanduser().resolve() if root_dir else None
         self.must_exist = must_exist
         self.warn_if_exists = warn_if_exists
         self.select = select
@@ -41,7 +41,7 @@ class PathField(Vertical):
         self.name_filter = re.compile(name_filter) if name_filter else None
         self.relative_check_path = relative_check_path
         self.max_suggestions = max_suggestions
-        self._placeholder = placeholder or str(self.root_dir)
+        self._placeholder = placeholder or (str(self.root_dir) if self.root_dir else "")
         self._input_id = input_id
         self._autocomplete_id = autocomplete_id
         self._input: Optional[Input] = None
@@ -72,8 +72,10 @@ class PathField(Vertical):
     def _initial_value(self) -> str:
         if not self.initial_path:
             return ""
+        resolved = self.initial_path.expanduser().resolve()
+        if self.root_dir is None:
+            return str(resolved)
         try:
-            resolved = self.initial_path.expanduser().resolve()
             rel = resolved.relative_to(self.root_dir)
         except Exception:
             return ""
@@ -83,24 +85,41 @@ class PathField(Vertical):
         text = state.text or ""
 
         try:
-            # "/" means list root
-            rel = text.lstrip("/")
-            base = (self.root_dir / rel).resolve(strict=False)
-            if not base.is_relative_to(self.root_dir):
-                return []
-            ends_with_slash = text.endswith("/")
-            if rel == ".":
-                parent = self.root_dir
-                prefix = "."
-            elif rel == "/":
-                parent = self.root_dir
-                prefix = ""
-            elif ends_with_slash:
-                parent = base
-                prefix = ""
+            rel: Optional[str] = None
+            if self.root_dir is None:
+                home = Path.home()
+                if not text:
+                    parent = home
+                    prefix = ""
+                else:
+                    raw = Path(text).expanduser()
+                    base = raw if raw.is_absolute() else (home / raw)
+                    ends_with_slash = text.endswith("/")
+                    if ends_with_slash:
+                        parent = base
+                        prefix = ""
+                    else:
+                        parent = base.parent
+                        prefix = base.name
             else:
-                parent = base.parent
-                prefix = base.name
+                # "/" means list root
+                rel = text.lstrip("/")
+                base = (self.root_dir / rel).resolve(strict=False)
+                if not base.is_relative_to(self.root_dir):
+                    return []
+                ends_with_slash = text.endswith("/")
+                if rel == ".":
+                    parent = self.root_dir
+                    prefix = "."
+                elif rel == "/":
+                    parent = self.root_dir
+                    prefix = ""
+                elif ends_with_slash:
+                    parent = base
+                    prefix = ""
+                else:
+                    parent = base.parent
+                    prefix = base.name
 
             if not parent.exists() or not parent.is_dir():
                 return []
@@ -113,11 +132,12 @@ class PathField(Vertical):
             )
             for p in entries:
                 p_abs = p.resolve(strict=False)
-                if not (p_abs == self.root_dir or p_abs.is_relative_to(self.root_dir)):
-                    continue
+                if self.root_dir is not None:
+                    if not (p_abs == self.root_dir or p_abs.is_relative_to(self.root_dir)):
+                        continue
                 if self.name_filter and not self.name_filter.match(p.name):
                     continue
-                if rel != "." and p.name.startswith("."):
+                if (rel is None or rel != ".") and p.name.startswith("."):
                     continue
 
                 if prefix and not p.name.startswith(prefix):
@@ -126,11 +146,15 @@ class PathField(Vertical):
                 if self.select == "dir" and p.is_file():
                     continue
 
-                rel_path = p.relative_to(self.root_dir)
+                if self.root_dir is None:
+                    main = str(p)
+                else:
+                    rel_path = p.relative_to(self.root_dir)
+                    main = "/" + str(rel_path)
 
                 items.append(
                     DropdownItem(
-                        main="/" + str(rel_path),
+                        main=main,
                         prefix="📁 " if p.is_dir() else "📄 ",
                     )
                 )

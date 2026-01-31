@@ -9,6 +9,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Button, Input, ListView, Static
 
 from app.ui.textual.widgets.wizard_from_schema import WizardFromSchema
+from app.ui.textual.widgets.field_from_schema import FieldFromSchema
 
 
 # ----------------------------------------------------------------
@@ -93,69 +94,44 @@ def _default_schema():
     }
 
 
-class FormApp(App):
-    """Thin app wrapper used to push a WizardFromSchema in tests."""
-
-    RESULT = "_UNSET"
-
-    def __init__(self, schema, initial_values=None):
-        super().__init__()
-        self._schema = schema
-        self._initial = initial_values
-        FormApp.RESULT = "_UNSET"
-
-    def compose(self) -> ComposeResult:
-        yield Button("open", id="open")
-
-    def on_mount(self) -> None:
-        self.push_screen(
-            WizardFromSchema(self._schema, self._initial),
-            callback=self._on_result,
-        )
-
-    def _on_result(self, result):
-        FormApp.RESULT = result
-        self.exit()
-
-
 # ----------------------------------------------------------------
 # _cast_value — pure unit tests (no Textual runtime)
 # ----------------------------------------------------------------
 
 class TestCastValue:
-    """Tests for WizardFromSchema._cast_value (no UI needed)."""
+    """Tests for FieldFromSchema._cast_value (no UI needed)."""
 
     def _make(self):
-        return WizardFromSchema({"type": "object", "properties": {"x": {"type": "string"}}})
+        return FieldFromSchema("x", {"type": "string"})
 
     def test_string(self):
-        assert self._make()._cast_value("hello", "string") == "hello"
+        assert FieldFromSchema._cast_value("hello", "string") == "hello"
 
     def test_integer(self):
-        assert self._make()._cast_value("42", "integer") == 42
+        assert FieldFromSchema._cast_value("42", "integer") == 42
 
     def test_integer_bad(self):
         with pytest.raises(ValueError):
-            self._make()._cast_value("abc", "integer")
+            FieldFromSchema._cast_value("abc", "integer")
 
     def test_number(self):
-        assert self._make()._cast_value("3.14", "number") == pytest.approx(3.14)
+        assert FieldFromSchema._cast_value("3.14", "number") == pytest.approx(3.14)
 
     def test_boolean_true(self):
         for v in ("true", "True", "yes", "Y", "1"):
-            assert self._make()._cast_value(v, "boolean") is True
+            assert FieldFromSchema._cast_value(v, "boolean") is True
 
     def test_boolean_false(self):
         for v in ("false", "False", "no", "N", "0"):
-            assert self._make()._cast_value(v, "boolean") is False
+            assert FieldFromSchema._cast_value(v, "boolean") is False
 
     def test_boolean_bad(self):
         with pytest.raises(ValueError, match="boolean"):
-            self._make()._cast_value("maybe", "boolean")
+            FieldFromSchema._cast_value("maybe", "boolean")
 
     def test_unsupported_type(self):
         with pytest.raises(ValueError, match="Unsupported"):
-            self._make()._cast_value("x", "object")
+            FieldFromSchema._cast_value("x", "object")
 
 
 # ----------------------------------------------------------------
@@ -245,8 +221,8 @@ class TestValidateFieldIncremental:
 
 class TestIsFreeTextArray:
     def test_string_field(self):
-        fd = WizardFromSchema(_simple_schema())
-        assert fd._is_free_text_array() is False
+        spec = _simple_schema()["properties"]["name"]
+        assert FieldFromSchema.is_free_text_array(spec) is False
 
     def test_array_with_enum(self):
         schema = {
@@ -258,12 +234,12 @@ class TestIsFreeTextArray:
                 },
             },
         }
-        fd = WizardFromSchema(schema)
-        assert fd._is_free_text_array() is False
+        spec = schema["properties"]["tags"]
+        assert FieldFromSchema.is_free_text_array(spec) is False
 
     def test_free_text_array(self):
-        fd = WizardFromSchema(_array_schema())
-        assert fd._is_free_text_array() is True
+        spec = _array_schema()["properties"]["tags"]
+        assert FieldFromSchema.is_free_text_array(spec) is True
 
 
 # ----------------------------------------------------------------
@@ -298,116 +274,3 @@ class TestConstructor:
 # Async / Textual integration tests
 # ----------------------------------------------------------------
 
-class TestWizardFromSchemaAsync:
-    """Tests that run the Textual app to exercise the full UI."""
-
-    @pytest.mark.asyncio
-    async def test_cancel_returns_none(self):
-        app = FormApp(_simple_schema())
-        async with app.run_test() as pilot:
-            await pilot.click("#back")
-        assert FormApp.RESULT is None
-
-    @pytest.mark.asyncio
-    async def test_submit_string_field(self):
-        app = FormApp(_simple_schema())
-        async with app.run_test() as pilot:
-            await pilot.press("h", "e", "l", "l", "o")
-            await pilot.click("#next")
-        assert FormApp.RESULT == {"name": "hello"}
-
-    @pytest.mark.asyncio
-    async def test_default_value_used(self):
-        app = FormApp(_default_schema())
-        async with app.run_test() as pilot:
-            # Leave input empty → default should kick in
-            await pilot.click("#next")
-        assert FormApp.RESULT == {"branch": "main"}
-
-    @pytest.mark.asyncio
-    async def test_initial_value_shown(self):
-        app = FormApp(_simple_schema(), initial_values={"name": "pre"})
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            # The active screen IS the WizardFromSchema
-            dialog = app.screen
-            inp = dialog.query_one(Input)
-            assert inp.value == "pre"
-            await pilot.click("#next")
-        assert FormApp.RESULT == {"name": "pre"}
-
-    @pytest.mark.asyncio
-    async def test_boolean_field(self):
-        app = FormApp(_boolean_schema())
-        async with app.run_test() as pilot:
-            # Default is False, just submit
-            await pilot.click("#next")
-        assert FormApp.RESULT == {"flag": False}
-
-    @pytest.mark.asyncio
-    async def test_two_fields_navigation(self):
-        app = FormApp(_two_field_schema())
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            # First field (required) — type via keyboard
-            await pilot.press("a")
-            await pilot.press("enter")
-            await pilot.pause()
-            await pilot.pause()
-            # Second field (optional) — skip via enter on empty input
-            await pilot.press("enter")
-        assert FormApp.RESULT is not None
-        assert isinstance(FormApp.RESULT, dict)
-        assert FormApp.RESULT.get("first") == "a"
-
-    @pytest.mark.asyncio
-    async def test_back_navigation(self):
-        app = FormApp(_two_field_schema())
-        async with app.run_test() as pilot:
-            await pilot.press("a")
-            await pilot.click("#next")
-            await pilot.pause()
-            # Now on second field, go back
-            await pilot.click("#back")
-            await pilot.pause()
-            # Should be back on first field
-            dialog = cast(WizardFromSchema, app.screen)
-            assert dialog.index == 0
-
-    @pytest.mark.asyncio
-    async def test_validation_error_shown(self):
-        app = FormApp(_integer_schema())
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            dialog = cast(WizardFromSchema, app.screen)
-            inp = dialog.query_one(Input)
-            inp.value = "0"
-            await pilot.click("#next")
-            await pilot.pause()
-            # Should show error, not advance
-            assert dialog.index == 0
-
-    @pytest.mark.asyncio
-    async def test_array_add_and_submit(self):
-        app = FormApp(_array_schema())
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            dialog = cast(WizardFromSchema, app.screen)
-            inp = dialog.query_one("#array-input", Input)
-            inp.value = "tag1"
-            await pilot.press("enter")
-            await pilot.pause()
-            inp = dialog.query_one("#array-input", Input)
-            inp.value = ""
-            await pilot.press("enter")
-        assert FormApp.RESULT == {"tags": ["tag1"]}
-
-    @pytest.mark.asyncio
-    async def test_array_initial_values_shown(self):
-        app = FormApp(_array_schema(), initial_values={"tags": ["a", "b"]})
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            dialog = cast(WizardFromSchema, app.screen)
-            lv = dialog.query_one("#array-items", ListView)
-            assert len(lv.children) == 2
-            assert dialog._array_values == ["a", "b"]

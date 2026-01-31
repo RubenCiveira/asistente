@@ -19,6 +19,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static, Tree
 
 from app.ui.textual.widgets.config_dialog import ConfigPage, ConfigDialog, ConfigValues
+from app.ui.textual.widgets.report import Report
 
 class ConfigProvider(ABC):
     """Abstract base class for configuration page providers.
@@ -149,7 +150,20 @@ class AppConfigDialog(ConfigDialog):
             return
         self.query_one("#config-errors", Static).update("")
         values = self._collect_all_values()
-        self._notify_providers(values)
+        try:
+            self._notify_providers(values)
+        except Exception as exc:
+            message = str(exc).strip()
+            if not message:
+                message = "Failed to save configuration."
+            self.app.push_screen(
+                Report(
+                    message=message,
+                    level="error",
+                    exception=exc,
+                )
+            )
+            return
         self.post_message(self.Applied(values))
         self.run_worker(self._reload_pages())
 
@@ -161,5 +175,18 @@ class AppConfigDialog(ConfigDialog):
             )
             return
         values = self._collect_all_values()
-        self._notify_providers(values)
+        try:
+            self._notify_providers(values)
+        except Exception as exc:
+            message = str(exc).strip()
+            if not message:
+                message = "Failed to save configuration."
+            self.app.push_screen(
+                Report(
+                    message=message,
+                    level="error",
+                    exception=exc,
+                )
+            )
+            return
         self.dismiss(values)

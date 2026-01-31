@@ -173,13 +173,15 @@ class RagConfigProvider(ConfigProvider):
 
         # 1. Update PostgreSQL connection
         v = rag_cv.values
-        self.window.config.postgres_rag = PostgresRagConfig(
-            host=v.get("host", "localhost"),
-            port=v.get("port", 5432),
-            database=v.get("database", ""),
-            user=v.get("user", ""),
-            password=v.get("password", ""),
-            table=v.get("table", ""),
+        self.window.config.save_rag_connection(
+            PostgresRagConfig(
+                host=v.get("host", "localhost"),
+                port=v.get("port", 5432),
+                database=v.get("database", ""),
+                user=v.get("user", ""),
+                password=v.get("password", ""),
+                table=v.get("table", ""),
+            )
         )
 
         # 2. Update global topic definitions

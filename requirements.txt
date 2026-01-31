@@ -8,3 +8,4 @@ jsonschema==4.26.0
 prompt_toolkit==3.0.52
 textual==7.4.0
 textual-autocomplete==4.0.6
+psycopg[binary]==3.2.13

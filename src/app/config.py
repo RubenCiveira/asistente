@@ -122,6 +122,12 @@ class AppConfig:
             topics=topics,
         )
 
+    def save_rag_connection(self, connection: PostgresRagConfig) -> None:
+        from app.rag.postgres_rag_setup import PostgresRagSetup
+
+        PostgresRagSetup(connection).configure()
+        self.postgres_rag = connection
+
     def save(self) -> None:
         """Persist the current configuration to disk as pretty-printed JSON.
 

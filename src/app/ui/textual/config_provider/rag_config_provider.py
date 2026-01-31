@@ -17,8 +17,8 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from app.config import PostgresRagConfig, Topic
+from app.ui.textual.app_config_dialog import ConfigProvider   
 from app.ui.textual.widgets.config_dialog import ConfigPage, ConfigValues
-from app.ui.textual.widgets.config_provider import ConfigProvider
 
 
 def _topic_selection_schema(

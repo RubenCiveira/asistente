@@ -38,7 +38,7 @@ from app.ui.textual.completion_provider.slash_provider import SlashCommandProvid
 from app.ui.textual.completion_provider.at_provider import ContextProvider
 from app.ui.textual.completion_provider.colon_provider import PowerCommandProvider
 from app.ui.textual.completion_provider.hash_provider import SemanticProvider
-# from app.ui.textual.config_provider.rag_config_provider import RagConfigProvider
+from app.ui.textual.config_provider.rag_config_provider import RagConfigProvider
 
 class MainApp(App):
     """Tabbed multi-session Textual application.

@@ -24,10 +24,10 @@ def _new_session_id() -> str:
     """Generate a new UUID-4 string for use as a session identifier."""
     return str(uuid.uuid4())
 
-@dataclass(frozen=True)
-class CallbackPill:
-    description: str
-    callback: Callable[[], Any]
+#@dataclass(frozen=True)
+#class CallbackPill:
+#    description: str
+#    callback: Callable[[], Any]
 
 @dataclass(frozen=True)
 class MessageKind:
@@ -51,6 +51,7 @@ class Session:
     project: Optional[Project] = None
     agent: RootAgent = field(default_factory=RootAgent)
     asking: bool = False
+    action: str = ""
     question: str = ""
     messages: list[MessageKind] = field(default_factory=list)
     _listeners: list[Callable[["Session"], None]] = field(default_factory=list, init=False, repr=False)
@@ -82,12 +83,16 @@ class Session:
         self.messages.append(MessageKind("user", text))
         self.question = text
         self.asking = True
+        self.step = self.agent.execute( self.question )
+        self.action = "thinking"
         self._notify()
-        return CallbackPill("thinking", self._run)
+        return self._run
+        # return CallbackPill("thinking", self._run)
 
     async def _run(self) -> None:
         try:
-            response = await asyncio.to_thread(self.agent.execute, self.question)
+            response = await asyncio.to_thread( self.step.invoke )
+#            response = await asyncio.to_thread(self.agent.execute, self.question)
         except Exception as exc:
             response = f"Error: {exc}"
         self.messages.append(MessageKind("assistant", response))

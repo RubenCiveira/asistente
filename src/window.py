@@ -18,7 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Markdown, TabbedContent, TabPane, Static
+from textual.widgets import Header, Footer, Input, LoadingIndicator, Markdown, TabbedContent, TabPane, Static
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from rich.text import Text
 
@@ -72,13 +72,14 @@ class MainApp(App):
         align-vertical: middle;
     }
 
-    #status_indicator {
-        width: 3;
+    #status_label {
         content-align: left middle;
     }
 
-    #status_label {
-        content-align: left middle;
+    #status_loading {
+        width: 3;
+        height: 1;
+        margin-right: 1;
     }
 
     #status_spacer {
@@ -241,7 +242,7 @@ class MainApp(App):
             # yield Input(placeholder="Escribe aqui... (Enter para enviar)", id="prompt")
             yield chat
             with Horizontal(id="status_bar"):
-                yield Static("", id="status_indicator")
+                yield LoadingIndicator(id="status_loading")
                 yield Static("", id="status_label")
                 yield Static("", id="status_spacer")
                 yield Horizontal(id="status_actions")
@@ -378,13 +379,13 @@ class MainApp(App):
         result = await self.active_session.ask(text)
         if result is None:
             return
-        self.run_worker(self._ask_callback(result.callback))
+        self.run_worker(self._ask_callback(result))
 
     async def _ask_callback(self, callback):
         result = await callback()
         if result is None:
             return
-        self.run_worker(self._ask_callback(result.callback))
+        self.run_worker(self._ask_callback(result))
 
     def _bind_session(self, session: Session) -> None:
         session.subscribe(self._on_session_change)
@@ -405,13 +406,15 @@ class MainApp(App):
         self._update_status(session)
 
     def _update_status(self, session: Session) -> None:
-        indicator = self.query_one("#status_indicator", Static)
+        indicator = self.query_one("#status_loading", LoadingIndicator)
         label = self.query_one("#status_label", Static)
         if session.asking:
-            indicator.update("...")
-            label.update("Pensando...")
+            indicator.display = True
+            label.display = True
+            label.update("thinkig")
         else:
-            indicator.update("")
+            indicator.display = False
+            label.display = False
             label.update("")
 
     def _refresh_header(self) -> None:

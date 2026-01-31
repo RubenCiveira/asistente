@@ -67,6 +67,12 @@ class Session:
         for listener in list(self._listeners):
             listener(self)
 
+    def clear(self) -> None:
+        self.messages.clear()
+        self.asking = False
+        self.question = ""
+        self._notify()
+
     async def ask(self, text: str) -> CallbackPill | None:
         text = text.strip()
         if not text:

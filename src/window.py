@@ -18,8 +18,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Markdown, TabbedContent, TabPane
-from textual.containers import Vertical, VerticalScroll
+from textual.widgets import Header, Footer, Input, Markdown, TabbedContent, TabPane, Static
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from rich.text import Text
 
 from app.config import AppConfig
@@ -64,6 +64,25 @@ class MainApp(App):
 
     #prompt {
         border: round $accent;
+    }
+
+    #status_bar {
+        height: 2;
+        padding: 0 1;
+        align-vertical: middle;
+    }
+
+    #status_indicator {
+        width: 3;
+        content-align: left middle;
+    }
+
+    #status_label {
+        content-align: left middle;
+    }
+
+    #status_spacer {
+        width: 1fr;
     }
     """
 
@@ -221,6 +240,11 @@ class MainApp(App):
                         yield VerticalScroll(id=f"chat-{session.id}", classes="session-chat")
             # yield Input(placeholder="Escribe aqui... (Enter para enviar)", id="prompt")
             yield chat
+            with Horizontal(id="status_bar"):
+                yield Static("", id="status_indicator")
+                yield Static("", id="status_label")
+                yield Static("", id="status_spacer")
+                yield Horizontal(id="status_actions")
             yield Footer()
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
@@ -378,6 +402,17 @@ class MainApp(App):
         if session.asking:
             chat.mount(Markdown("**assistant>** ..."))
         chat.scroll_end(animate=False)
+        self._update_status(session)
+
+    def _update_status(self, session: Session) -> None:
+        indicator = self.query_one("#status_indicator", Static)
+        label = self.query_one("#status_label", Static)
+        if session.asking:
+            indicator.update("...")
+            label.update("Pensando...")
+        else:
+            indicator.update("")
+            label.update("")
 
     def _refresh_header(self) -> None:
         """Update the application title bar with the active workspace and project."""

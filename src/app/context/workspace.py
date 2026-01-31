@@ -8,7 +8,7 @@ manifest and tracking which project is currently active.
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Set
 
 
@@ -27,7 +27,9 @@ class Workspace:
 
     root_dir: Path
     name: str
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     projects: List[Path] = field(default_factory=list)
     active_project: Optional[Path] = None
     topics: List[str] = field(default_factory=list)

@@ -126,7 +126,7 @@ class MainApp(App):
             self._bind_session(session)
 
         idx = max(0, min(self.config.active_session_index, len(self.sessions) - 1))
-        self.active_session = self.sessions[idx]
+        self.config.active_session = self.sessions[idx]
 
         self._select_project_action = SelectProject(self)
         self._select_workspace_action = SelectWorkspace(self, self._select_project_action)
@@ -134,28 +134,28 @@ class MainApp(App):
 
     def get_active_workspace(self):
         """Return the workspace of the active session (may be ``None``)."""
-        return self.active_session.workspace
+        return self.config.active_session.workspace
 
     def get_active_project(self):
         """Return the project of the active session (may be ``None``)."""
-        return self.active_session.project
+        return self.config.active_session.project
 
     def select_workspace(self, ws) -> None:
         """Set *ws* as the active workspace, clear the project and persist."""
-        self.active_session.workspace = ws
-        self.active_session.project = None
+        self.config.active_session.workspace = ws
+        self.config.active_session.project = None
         self.config.set_active_workspace(ws.root_dir)
-        self._update_tab_label(self.active_session)
+        self._update_tab_label(self.config.active_session)
         self._save_sessions()
         self._refresh_header()
 
     def select_project(self, prj) -> None:
         """Set *prj* as the active project and persist."""
-        if not self.active_session.workspace:
+        if not self.config.active_session.workspace:
             return
-        self.active_session.workspace.set_active_project(prj.root_dir)
-        self.active_session.project = prj
-        self._update_tab_label(self.active_session)
+        self.config.active_session.workspace.set_active_project(prj.root_dir)
+        self.config.active_session.project = prj
+        self._update_tab_label(self.config.active_session)
         self._save_sessions()
         self._refresh_header()
 
@@ -169,7 +169,7 @@ class MainApp(App):
             }
             for s in self.sessions
         ]
-        self.config.active_session_index = self.sessions.index(self.active_session)
+        self.config.active_session_index = self.sessions.index(self.config.active_session)
         self.config.save()
 
     def echo(self, result: Markdown | str | None) -> None:
@@ -193,7 +193,7 @@ class MainApp(App):
 
     def _active_chat(self) -> VerticalScroll:
         """Return the chat scroll container for the active session."""
-        return self.query_one(f"#chat-{self.active_session.id}", VerticalScroll)
+        return self.query_one(f"#chat-{self.config.active_session.id}", VerticalScroll)
 
     def on_mount(self) -> None:
         """Restore workspace/project references for every session from config."""
@@ -221,10 +221,10 @@ class MainApp(App):
         if not saved and self.config.active_workspace and self.config.active_workspace.exists():
             try:
                 ws = Workspace.load_or_create(self.config.active_workspace, valid_topics=vt)
-                self.active_session.workspace = ws
+                self.config.active_session.workspace = ws
                 if ws.active_project and ws.active_project.exists():
                     prj = Project.load_or_create(ws.active_project, valid_topics=vt)
-                    self.active_session.project = prj
+                    self.config.active_session.project = prj
             except Exception:
                 pass
 
@@ -268,9 +268,9 @@ class MainApp(App):
         sid = pane_id.removeprefix("tab-")
         for s in self.sessions:
             if s.id == sid:
-                self.active_session = s
+                self.config.active_session = s
                 break
-        self._render_session(self.active_session)
+        self._render_session(self.config.active_session)
         self._refresh_header()
 
     def _tab_label(self, session: Session) -> str:
@@ -289,7 +289,7 @@ class MainApp(App):
 
     def action_clear_text(self) -> None:
         """Keybinding action: clear all messages from the active chat area."""
-        self.active_session.clear()
+        self.config.active_session.clear()
 
     def action_select_project(self) -> None:
         """Keybinding action: launch the project-selection flow."""
@@ -330,7 +330,7 @@ class MainApp(App):
         await pane_widget.mount(VerticalScroll(id=f"chat-{session.id}", classes="session-chat"))
 
         tabs.active = f"tab-{session.id}"
-        self.active_session = session
+        self.config.active_session = session
         self._save_sessions()
         self._refresh_header()
 
@@ -353,7 +353,7 @@ class MainApp(App):
         if not confirmed:
             return
 
-        closing = self.active_session
+        closing = self.config.active_session
         was_last = len(self.sessions) == 1
 
         if was_last:
@@ -371,7 +371,7 @@ class MainApp(App):
 
         closing.unsubscribe(self._on_session_change)
         self.sessions.remove(closing)
-        self.active_session = self.sessions[0]
+        self.config.active_session = self.sessions[0]
 
         tabs = self.query_one("#tabs", TabbedContent)
         await tabs.remove_pane(f"tab-{closing.id}")
@@ -390,7 +390,7 @@ class MainApp(App):
         self.run_worker(self._ask_session(text))
 
     async def _ask_session(self, text: str):
-        result = await self.active_session.ask(text)
+        result = await self.config.active_session.ask(text)
         if result is None:
             return
         self.run_worker(self._ask_callback(result))
@@ -408,7 +408,7 @@ class MainApp(App):
         self._render_session( session )
 
     def _render_session(self, session: Session) -> None:
-        if session != self.active_session:
+        if session != self.config.active_session:
             return
         chat = self._active_chat()
         chat.remove_children()
@@ -433,8 +433,8 @@ class MainApp(App):
 
     def _refresh_header(self) -> None:
         """Update the application title bar with the active workspace and project."""
-        ws = self.active_session.workspace
-        prj = self.active_session.project
+        ws = self.config.active_session.workspace
+        prj = self.config.active_session.project
         ws_name = ws.name if ws else "Sin workspace"
         prj_name = prj.name if prj else "Sin projecto"
         self.title = f"Asistente  ·  {ws_name} / {prj_name}"

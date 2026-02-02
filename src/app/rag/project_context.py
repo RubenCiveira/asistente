@@ -31,6 +31,7 @@ class ProjectContextRetriever:
     ) -> str:
         topics = self._collect_topics(workspace, project)
         if not topics:
+            raise RuntimeError("NO TOPICS")
             return ""
 
         query_vector = self.embeddings.embed_query(question)
@@ -60,28 +61,8 @@ class ProjectContextRetriever:
         return unique
 
     def _load_active_context(self) -> tuple[Workspace | None, Project | None]:
-        sessions = self.config.sessions
-        if not sessions:
-            return None, None
-        index = self.config.active_session_index
-        if index < 0 or index >= len(sessions):
-            return None, None
-        session = sessions[index]
-        ws_path = session.get("workspace") if isinstance(session, dict) else None
-        prj_path = session.get("project") if isinstance(session, dict) else None
-        if not ws_path or not prj_path:
-            return None, None
-
-        ws = None
-        prj = None
-        valid_topics = self.config.topic_names()
-        ws_candidate = Path(ws_path)
-        if ws_candidate.exists():
-            ws = Workspace.load_or_create(ws_candidate, valid_topics=valid_topics)
-        prj_candidate = Path(prj_path)
-        if prj_candidate.exists():
-            prj = Project.load_or_create(prj_candidate, valid_topics=valid_topics)
-        return ws, prj
+        session = self.config.active_session
+        return session.workspace, session.project
 
     def _search(self, vector_literal: str, topics: List[str], k: int) -> List[str]:
         pg_module, sql_module = self._load_psycopg()

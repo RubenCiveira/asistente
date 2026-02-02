@@ -198,8 +198,8 @@ class RagConfigProvider(ConfigProvider):
                         new_topics.append(Topic(name=name, path=path))
             else:
                 new_topics = list(self.window.config.topics)
-            self.window.config.save_topics(new_topics)
 
+            self.window.config.save_topics(new_topics)
             valid = self.window.config.topic_names()
 
             # 3. Update workspace topics
@@ -219,7 +219,6 @@ class RagConfigProvider(ConfigProvider):
                     prj_cv.values.get("topics", [])
                 )
                 prj.save(valid_topics=valid)
-
             def _run_ingest(monitor: ProgressMonitor) -> None:
                 RagIngest(self.window.config).ingest(monitor)
 
@@ -232,10 +231,8 @@ class RagConfigProvider(ConfigProvider):
         for topic in topics:
             if isinstance(topic, dict):
                 name = str(topic.get("name", "")).strip()
-            elif topic.name is not None:
-                name = str(topic.name).strip()
             else:
-                name = str(topic).strip()
+                name = str(getattr(topic, "name", topic)).strip()
             if name:
                 names.append(name)
         return names

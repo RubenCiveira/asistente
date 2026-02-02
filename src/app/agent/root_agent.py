@@ -84,15 +84,14 @@ class RagStep(AnstractThinkingStep):
         self.msg = msg
         self.agent = root
     def think(self):
-        time.sleep(2)
         rag = ProjectContextRetriever(self.agent.config)
         ctx = rag.get_active_context( self.msg )
         # return "EL CONTEXTO ES " + ctx
         return ThinkingResult("Tengo context " + str(len(ctx)), ctx)
     def and_then(self, prev):
-        time.sleep(2)
+        msg = self.msg
         context = prev.context or prev.response
-        return CallStep("""
+        return CallStep(f"""
 Usa SOLO el contexto para responder.
 
 Contexto:

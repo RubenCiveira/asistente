@@ -19,7 +19,6 @@ from app.config import AppConfig
 from app.context.workspace import Workspace
 from app.context.project import Project
 
-
 def _new_session_id() -> str:
     """Generate a new UUID-4 string for use as a session identifier."""
     return str(uuid.uuid4())
@@ -88,18 +87,27 @@ class Session:
         self.question = text
         self.asking = True
         self.step = self.agent.execute( self.question )
-        self.action = "thinking"
         self._notify()
         return self._run
-        # return CallbackPill("thinking", self._run)
 
     async def _run(self) -> None:
-        try:
-            response = await asyncio.to_thread( self.step.invoke )
-#            response = await asyncio.to_thread(self.agent.execute, self.question)
-        except Exception as exc:
-            response = f"Error: {exc}"
-        self.messages.append(MessageKind("assistant", response))
+        while True:
+            self.action = self.step.action
+            self._notify()
+            try:
+                response = await asyncio.to_thread(self.step.invoke)
+            except Exception as exc:
+                response = f"Error: {exc}"
+            self.messages.append(MessageKind("assistant", response))
+            self._notify()
+
+            if self.step.next is None:
+                break
+            next_step = self.step.next()
+            if next_step is None:
+                break
+            self.step = next_step
+
         self.asking = False
         self.question = ""
         self._notify()

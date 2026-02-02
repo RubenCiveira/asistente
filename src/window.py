@@ -425,7 +425,7 @@ class MainApp(App):
         if session.asking:
             indicator.display = True
             label.display = True
-            label.update("thinkig")
+            label.update( session.action )
         else:
             indicator.display = False
             label.display = False

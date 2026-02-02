@@ -23,6 +23,16 @@ class ProgressMonitor(ABC):
     def message(self) -> str:
         """Current operation message."""
 
+    @property
+    @abstractmethod
+    def title(self) -> str:
+        """Task title."""
+
+    @property
+    @abstractmethod
+    def error_count(self) -> int:
+        """Number of errors recorded."""
+
     @abstractmethod
     def set_total_pending(self, total: int) -> None:
         """Set total units pending for the task."""
@@ -38,3 +48,11 @@ class ProgressMonitor(ABC):
     @abstractmethod
     def finish(self) -> None:
         """Mark the task as completed."""
+
+    @abstractmethod
+    def set_title(self, title: str) -> None:
+        """Update the task title."""
+
+    @abstractmethod
+    def add_error(self, message: str) -> None:
+        """Record an error message for the task."""

@@ -19,7 +19,7 @@ from typing import Any, Dict, List
 from app.config import PostgresRagConfig, Topic
 from app.ui.textual.app_config_dialog import ConfigProvider   
 from app.ui.textual.widgets.config_dialog import ConfigPage, ConfigValues
-
+from app.rag.rag_ingest import RagIngest
 
 def _topic_selection_schema(
     options: List[Dict[str, Any]], description: str

@@ -25,6 +25,7 @@ class RagIngest:
 
     def ingest(self, monitor: ProgressMonitor) -> int:
         files = self._collect_files()
+        monitor.set_title("RAG ingest")
         monitor.set_total_pending(len(files))
         created = 0
 
@@ -53,7 +54,8 @@ class RagIngest:
                         # self._insert_embedding(cur, document_id, embedding)
                         created += 1
                         conn.commit()
-            except Exception:
+            except Exception as exc:
+                monitor.add_error(f"{topic_name}: {relative_path}: {exc}")
                 if conn is not None:
                     try:
                         conn.rollback()
@@ -93,15 +95,15 @@ class RagIngest:
                 yield path
 
     def _read_text(self, path: Path) -> str:
-        extracted = self.extractor.extract(path)
-        if extracted:
-            return extracted
-        if not self._is_probably_text_file(path):
-            return ""
         try:
+            extracted = self.extractor.extract(path)
+            if extracted:
+                return extracted
+            if not self._is_probably_text_file(path):
+                return ""
             return path.read_text(encoding="utf-8", errors="ignore")
-        except (OSError, UnicodeError):
-            return ""
+        except (OSError, UnicodeError) as exc:
+            raise RuntimeError(f"Failed to read {path}") from exc
 
     def _is_probably_text_file(self, path: Path) -> bool:
         try:

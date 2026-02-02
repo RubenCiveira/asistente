@@ -19,6 +19,8 @@ class UiProgressMonitor(ProgressMonitor):
         self._total_pending = 0
         self._completed = 0
         self._message = ""
+        self._title = "Progress"
+        self._errors: List[str] = []
         self._done = False
         self._listeners: List[Callable[["UiProgressMonitor"], None]] = []
 
@@ -39,6 +41,16 @@ class UiProgressMonitor(ProgressMonitor):
     def message(self) -> str:
         with self._lock:
             return self._message
+
+    @property
+    def title(self) -> str:
+        with self._lock:
+            return self._title
+
+    @property
+    def error_count(self) -> int:
+        with self._lock:
+            return len(self._errors)
 
     @property
     def completed(self) -> int:
@@ -80,6 +92,16 @@ class UiProgressMonitor(ProgressMonitor):
             if self._total_pending > 0:
                 self._completed = self._total_pending
             self._done = True
+        self._notify()
+
+    def set_title(self, title: str) -> None:
+        with self._lock:
+            self._title = title
+        self._notify()
+
+    def add_error(self, message: str) -> None:
+        with self._lock:
+            self._errors.append(message)
         self._notify()
 
     def subscribe(self, listener: Callable[["UiProgressMonitor"], None]) -> Callable[[], None]:
@@ -158,7 +180,10 @@ class ProgressDialog(ModalScreen[None]):
         percent = self._monitor.progress_percent
         total = self._monitor.total_pending
         completed = self._monitor.completed
+        title = self._monitor.title or "Progress"
+        errors = self._monitor.error_count
 
+        self.query_one("#progress-title", Static).update(title)
         self.query_one("#progress-message", Static).update(message)
         bar = self.query_one("#progress-bar", ProgressBar)
         bar.total = 100
@@ -166,7 +191,7 @@ class ProgressDialog(ModalScreen[None]):
         self.query_one(
             "#progress-summary",
             Static,
-        ).update(f"{completed}/{total} ({percent:.1f}%)")
+        ).update(f"{completed}/{total} ({percent:.1f}%)  Errors: {errors}")
 
         close = self.query_one("#progress-close", Button)
         close.disabled = not self._monitor.done

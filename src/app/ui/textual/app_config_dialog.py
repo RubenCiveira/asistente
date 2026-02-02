@@ -14,7 +14,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
-
 from textual.containers import VerticalScroll
 from textual.widgets import Static, Tree
 

@@ -14,8 +14,9 @@ class PostgresRagSetup:
 
     def __init__(self, config: PostgresRagConfig) -> None:
         self.config = config
-        self.documents_table = config.table or "documents"
-        self.embeddings_table = "embeddings"
+        prefix = config.table or ""
+        self.documents_table = prefix + "documents"
+        self.embeddings_table = prefix + "embeddings"
 
     def configure(self) -> None:
         """Connect to PostgreSQL and ensure schema requirements."""
@@ -41,6 +42,21 @@ class PostgresRagSetup:
         )
 
     def _ensure_pgvector(self, cur: Any) -> None:
+        cur.execute("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
+        if cur.fetchone() is not None:
+            return
+
+        cur.execute(
+            "SELECT usesuper FROM pg_roles WHERE rolname = current_user"
+        )
+        row = cur.fetchone()
+        is_superuser = bool(row[0]) if row else False
+        if not is_superuser:
+            raise RuntimeError(
+                "pgvector extension is not enabled and the current user is not a superuser. "
+                "Ask a database superuser to run: CREATE EXTENSION IF NOT EXISTS vector;"
+            )
+
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
         cur.execute("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
         if cur.fetchone() is None:
@@ -196,7 +212,7 @@ class PostgresRagSetup:
                 CREATE TABLE {table} (
                     id BIGSERIAL PRIMARY KEY,
                     document_id BIGINT NOT NULL REFERENCES {documents}(id) ON DELETE CASCADE,
-                    embedding VECTOR
+                    embedding VECTOR(1024)
                 )
                 """
             ).format(

@@ -194,7 +194,7 @@ class RagConfigProvider(ConfigProvider):
                 path = str(entry.get("path", "")).strip()
                 if name:
                     new_topics.append(Topic(name=name, path=path))
-            self.window.config.topics = new_topics
+            self.window.config.save_topics( new_topics )
 
             valid = self.window.config.topic_names()
 
@@ -211,5 +211,5 @@ class RagConfigProvider(ConfigProvider):
             if prj and prj_cv:
                 prj.topics = prj_cv.values.get("topics", [])
                 prj.save(valid_topics=valid)
-
+        
         self.window.config.save()

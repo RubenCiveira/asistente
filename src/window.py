@@ -116,11 +116,11 @@ class MainApp(App):
             for s in saved:
                 sid = s.get("id")
                 if isinstance(sid, str) and sid:
-                    self.sessions.append(Session(id=sid))
+                    self.sessions.append(Session(config=self.config, id=sid))
                 else:
-                    self.sessions.append(Session())
+                    self.sessions.append(Session(config=self.config))
         else:
-            self.sessions = [Session()]
+            self.sessions = [Session(config=self.config)]
 
         for session in self.sessions:
             self._bind_session(session)
@@ -318,7 +318,7 @@ class MainApp(App):
 
     async def _new_session(self) -> None:
         """Create a new session, add a tab for it and activate it."""
-        session = Session()
+        session = Session(config=self.config)
         self._bind_session(session)
         self.sessions.append(session)
 
@@ -357,7 +357,7 @@ class MainApp(App):
         was_last = len(self.sessions) == 1
 
         if was_last:
-            new_session = Session()
+            new_session = Session(config=self.config)
             self._bind_session(new_session)
             new_session.workspace = closing.workspace
             new_session.project = closing.project

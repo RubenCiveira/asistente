@@ -11,10 +11,10 @@ import uuid
 import asyncio
 
 from dataclasses import dataclass, field
-import asyncio
 from typing import Any, Callable, Optional
 
 from app.agent.root_agent import RootAgent
+from app.config import AppConfig
 
 from app.context.workspace import Workspace
 from app.context.project import Project
@@ -46,15 +46,19 @@ class Session:
         project: Currently selected project, or ``None``.
     """
 
+    config: AppConfig
     id: str = field(default_factory=_new_session_id)
     workspace: Optional[Workspace] = None
     project: Optional[Project] = None
-    agent: RootAgent = field(default_factory=RootAgent)
+    agent: RootAgent = field(init=False)
     asking: bool = False
     action: str = ""
     question: str = ""
     messages: list[MessageKind] = field(default_factory=list)
     _listeners: list[Callable[["Session"], None]] = field(default_factory=list, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.agent = RootAgent(self.config)
 
     def subscribe(self, listener: Callable[["Session"], None]) -> None:
         if listener not in self._listeners:

@@ -19,6 +19,8 @@ from app.config import AppConfig
 from app.context.workspace import Workspace
 from app.context.project import Project
 
+from app.context.thinking_step import ThinkingResult
+
 def _new_session_id() -> str:
     """Generate a new UUID-4 string for use as a session identifier."""
     return str(uuid.uuid4())
@@ -98,12 +100,13 @@ class Session:
                 response = await asyncio.to_thread(self.step.invoke)
             except Exception as exc:
                 response = f"Error: {exc}"
-            self.messages.append(MessageKind("assistant", response))
+            result = self._to_result( response )
+            self.messages.append(MessageKind("assistant", result.response))
             self._notify()
 
             if self.step.next is None:
                 break
-            next_step = self.step.next()
+            next_step = self.step.next(result)
             if next_step is None:
                 break
             self.step = next_step
@@ -111,3 +114,9 @@ class Session:
         self.asking = False
         self.question = ""
         self._notify()
+
+    def _to_result(self, value: Union[ThinkingResult, str]) -> ThinkingResult:
+        if isinstance(value, ThinkingResult):
+            return value
+        # Si es str, lo tratamos como "response" (sin context)
+        return ThinkingResult(response=value)

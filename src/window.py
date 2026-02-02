@@ -245,6 +245,7 @@ class MainApp(App):
             triggers=resolvers,
             id="chat_input",
         )
+        self.progress_button = ProgressButton(id="progress_button")
         yield Header()
         with Vertical():
             with TabbedContent(id="tabs"):
@@ -258,7 +259,7 @@ class MainApp(App):
                 yield Static("", id="status_label")
                 yield Static("", id="status_spacer")
                 with Horizontal(id="status_actions"):
-                    yield ProgressButton(id="progress_button")
+                    yield self.progress_button
             yield Footer()
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:

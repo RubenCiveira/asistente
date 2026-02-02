@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable, List
 
 from langchain_ollama import OllamaEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.config import AppConfig
 from app.context.progress import ProgressMonitor
@@ -22,6 +23,10 @@ class RagIngest:
         self.embeddings_table = prefix + "embeddings"
         self.embeddings = OllamaEmbeddings(model=model, base_url=base_url)
         self.extractor = RagContentExtractor()
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=900,
+            chunk_overlap=150,
+        )
 
     def ingest(self, monitor: ProgressMonitor) -> int:
         files = self._collect_files()
@@ -50,8 +55,11 @@ class RagIngest:
                             relative_path,
                             content,
                         )
-                        # embedding = self.embeddings.embed_documents([content])[0]
-                        # self._insert_embedding(cur, document_id, embedding)
+                        chunks = self._split_text(content)
+                        if chunks:
+                            embeddings = self.embeddings.embed_documents(chunks)
+                            for embedding in embeddings:
+                                self._insert_embedding(cur, document_id, embedding)
                         created += 1
                         conn.commit()
             except Exception as exc:
@@ -147,6 +155,9 @@ class RagIngest:
         printable_ratio = printable / len(sample)
         meaningful_ratio = meaningful / len(sample)
         return printable_ratio >= 0.95 and meaningful_ratio >= 0.2
+
+    def _split_text(self, content: str) -> list[str]:
+        return self.splitter.split_text(content)
 
     def _document_exists(self, cur: Any, topic: str, path: str) -> bool:
         _, sql_module = self._load_psycopg()

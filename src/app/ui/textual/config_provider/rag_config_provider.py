@@ -20,6 +20,7 @@ from app.config import PostgresRagConfig, Topic
 from app.ui.textual.app_config_dialog import ConfigProvider   
 from app.ui.textual.widgets.config_dialog import ConfigPage, ConfigValues
 from app.rag.rag_ingest import RagIngest
+from app.context.progress import ProgressMonitor
 
 def _topic_selection_schema(
     options: List[Dict[str, Any]], description: str
@@ -194,9 +195,12 @@ class RagConfigProvider(ConfigProvider):
                 path = str(entry.get("path", "")).strip()
                 if name:
                     new_topics.append(Topic(name=name, path=path))
-            self.window.config.save_topics( new_topics )
+            self.window.config.save_topics(new_topics)
 
-            RagIngest(self.window.config).ingest()
+            def _run_ingest(monitor: ProgressMonitor) -> None:
+                RagIngest(self.window.config).ingest(monitor)
+
+            self.window.progress_button.add(_run_ingest)
 
             valid = self.window.config.topic_names()
 

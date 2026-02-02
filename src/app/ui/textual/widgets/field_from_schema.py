@@ -202,14 +202,14 @@ class FieldFromSchema(Vertical):
             self.mount(inp)
 
     def get_value(self) -> Any:
+        if isinstance(self._widget, SelectionList):
+            return list(self._widget.selected)
+
         if self._spec.get("type") == "array":
             return list(self._array_values)
 
         if isinstance(self._widget, PathField):
             return self._widget.get_value()
-
-        if isinstance(self._widget, SelectionList):
-            return list(self._widget.selected)
 
         if isinstance(self._widget, RadioSet):
             prefix = f"{self._base_id()}--"

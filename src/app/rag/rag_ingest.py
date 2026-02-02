@@ -9,6 +9,7 @@ from typing import Any, Iterable, List
 from langchain_ollama import OllamaEmbeddings
 
 from app.config import AppConfig
+from app.context.progress import ProgressMonitor
 from app.rag.content_extractor import RagContentExtractor
 
 
@@ -22,19 +23,20 @@ class RagIngest:
         self.embeddings = OllamaEmbeddings(model=model, base_url=base_url)
         self.extractor = RagContentExtractor()
 
-    def ingest(self) -> int:
+    def ingest(self, monitor: ProgressMonitor) -> int:
+        files = self._collect_files()
+        monitor.set_total_pending(len(files))
         created = 0
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                for topic in self.config.topics:
-                    if not topic.path:
-                        continue
-                    topic_path = Path(topic.path).expanduser()
-                    if not topic_path.exists():
-                        continue
-                    for file_path in self._iter_files(topic_path):
-                        relative_path = file_path.relative_to(topic_path).as_posix()
-                        if self._document_exists(cur, topic.name, relative_path):
+
+        for topic_name, topic_path, file_path in files:
+            relative_path = file_path.relative_to(topic_path).as_posix()
+            monitor.set_message(f"{topic_name}: {relative_path}")
+            conn = None
+            try:
+                conn = self._connect()
+                with conn:
+                    with conn.cursor() as cur:
+                        if self._document_exists(cur, topic_name, relative_path):
                             continue
                         content = self._read_text(file_path)
                         if not content.strip():
@@ -43,15 +45,37 @@ class RagIngest:
                             continue
                         document_id = self._insert_document(
                             cur,
-                            topic.name,
+                            topic_name,
                             relative_path,
                             content,
                         )
                         # embedding = self.embeddings.embed_documents([content])[0]
                         # self._insert_embedding(cur, document_id, embedding)
                         created += 1
-            conn.commit()
+                        conn.commit()
+            except Exception:
+                if conn is not None:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+            finally:
+                monitor.advance(1)
+
+        monitor.finish()
         return created
+
+    def _collect_files(self) -> list[tuple[str, Path, Path]]:
+        files: list[tuple[str, Path, Path]] = []
+        for topic in self.config.topics:
+            if not topic.path:
+                continue
+            topic_path = Path(topic.path).expanduser()
+            if not topic_path.exists():
+                continue
+            for file_path in self._iter_files(topic_path):
+                files.append((topic.name, topic_path, file_path))
+        return files
 
     def _connect(self) -> Any:
         pg_module, _ = self._load_psycopg()

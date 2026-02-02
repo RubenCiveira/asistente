@@ -22,3 +22,19 @@ class ProgressMonitor(ABC):
     @abstractmethod
     def message(self) -> str:
         """Current operation message."""
+
+    @abstractmethod
+    def set_total_pending(self, total: int) -> None:
+        """Set total units pending for the task."""
+
+    @abstractmethod
+    def set_message(self, message: str) -> None:
+        """Update the current operation message."""
+
+    @abstractmethod
+    def advance(self, delta: int = 1) -> None:
+        """Advance progress by *delta* units."""
+
+    @abstractmethod
+    def finish(self) -> None:
+        """Mark the task as completed."""

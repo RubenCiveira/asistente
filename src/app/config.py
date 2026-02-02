@@ -125,7 +125,6 @@ class AppConfig:
     def save_topics(self, topics: List[Topic]):
         from app.rag.rag_ingest import RagIngest
         self.topics = topics
-        RagIngest(self).ingest()
 
     def save_rag_connection(self, connection: PostgresRagConfig) -> None:
         from app.rag.postgres_rag_setup import PostgresRagSetup

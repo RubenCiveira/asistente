@@ -196,6 +196,8 @@ class RagConfigProvider(ConfigProvider):
                     new_topics.append(Topic(name=name, path=path))
             self.window.config.save_topics( new_topics )
 
+            RagIngest(self.window.config).ingest()
+
             valid = self.window.config.topic_names()
 
             # 3. Update workspace topics

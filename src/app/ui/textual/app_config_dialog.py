@@ -12,7 +12,7 @@ dismissing).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 from textual.containers import VerticalScroll
 from textual.widgets import Static, Tree
@@ -68,7 +68,7 @@ class AppConfigDialog(ConfigDialog):
 
     def __init__(
         self,
-        providers: List[ConfigProvider],
+        providers: Sequence[ConfigProvider],
         title: str = "Configuration",
     ) -> None:
         self._providers = list(providers)

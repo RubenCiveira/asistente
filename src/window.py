@@ -40,6 +40,7 @@ from app.ui.textual.completion_provider.at_provider import ContextProvider
 from app.ui.textual.completion_provider.colon_provider import PowerCommandProvider
 from app.ui.textual.completion_provider.hash_provider import SemanticProvider
 from app.ui.textual.config_provider.rag_config_provider import RagConfigProvider
+from app.ui.textual.progress import ProgressButton
 
 class MainApp(App):
     """Tabbed multi-session Textual application.
@@ -85,6 +86,12 @@ class MainApp(App):
     #status_spacer {
         width: 1fr;
     }
+
+    #status_actions {
+        width: auto;
+        align: right middle;
+        height: 1;
+    }
     """
 
     BINDINGS = [
@@ -105,10 +112,13 @@ class MainApp(App):
 
         saved = self.config.sessions
         if saved:
-            self.sessions = [
-                Session(id=s["id"]) if s.get("id") else Session()
-                for s in saved
-            ]
+            self.sessions = []
+            for s in saved:
+                sid = s.get("id")
+                if isinstance(sid, str) and sid:
+                    self.sessions.append(Session(id=sid))
+                else:
+                    self.sessions.append(Session())
         else:
             self.sessions = [Session()]
 
@@ -141,6 +151,8 @@ class MainApp(App):
 
     def select_project(self, prj) -> None:
         """Set *prj* as the active project and persist."""
+        if not self.active_session.workspace:
+            return
         self.active_session.workspace.set_active_project(prj.root_dir)
         self.active_session.project = prj
         self._update_tab_label(self.active_session)
@@ -160,7 +172,7 @@ class MainApp(App):
         self.config.active_session_index = self.sessions.index(self.active_session)
         self.config.save()
 
-    def echo(self, result: Markdown | string | None) -> None:
+    def echo(self, result: Markdown | str | None) -> None:
         """Append a :class:`Markdown` widget to the active chat and scroll down."""
         if result is None:
             return
@@ -245,7 +257,8 @@ class MainApp(App):
                 yield LoadingIndicator(id="status_loading")
                 yield Static("", id="status_label")
                 yield Static("", id="status_spacer")
-                yield Horizontal(id="status_actions")
+                with Horizontal(id="status_actions"):
+                    yield ProgressButton(id="progress_button")
             yield Footer()
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:

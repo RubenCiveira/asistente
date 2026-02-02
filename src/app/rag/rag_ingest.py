@@ -58,8 +58,13 @@ class RagIngest:
                         chunks = self._split_text(content)
                         if chunks:
                             embeddings = self.embeddings.embed_documents(chunks)
-                            for embedding in embeddings:
-                                self._insert_embedding(cur, document_id, embedding)
+                            for chunk_text, embedding in zip(chunks, embeddings):
+                                self._insert_embedding(
+                                    cur,
+                                    document_id,
+                                    chunk_text,
+                                    embedding,
+                                )
                         created += 1
                         conn.commit()
             except Exception as exc:
@@ -194,14 +199,20 @@ class RagIngest:
             raise RuntimeError("Failed to insert document row.")
         return int(row[0])
 
-    def _insert_embedding(self, cur: Any, document_id: int, embedding: List[float]) -> None:
+    def _insert_embedding(
+        self,
+        cur: Any,
+        document_id: int,
+        content: str,
+        embedding: List[float],
+    ) -> None:
         _, sql_module = self._load_psycopg()
         vector_literal = self._vector_literal(embedding)
         cur.execute(
             sql_module.SQL(
-                "INSERT INTO {} (document_id, embedding) VALUES (%s, %s::vector)"
+                "INSERT INTO {} (document_id, content, embedding) VALUES (%s, %s, %s::vector)"
             ).format(sql_module.Identifier(self.embeddings_table)),
-            (document_id, vector_literal),
+            (document_id, content, vector_literal),
         )
 
     def _vector_literal(self, embedding: List[float]) -> str:

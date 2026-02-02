@@ -84,7 +84,7 @@ class PostgresRagSetup:
             return
 
         columns = self._column_types(cur, table_name)
-        required = {"document_id": "bigint", "embedding": "vector"}
+        required = {"document_id": "bigint", "embedding": "vector", "content": "text"}
         self._validate_columns(table_name, columns, required)
 
         if not self._has_foreign_key(cur, table_name, "document_id", documents_table):
@@ -212,6 +212,7 @@ class PostgresRagSetup:
                 CREATE TABLE {table} (
                     id BIGSERIAL PRIMARY KEY,
                     document_id BIGINT NOT NULL REFERENCES {documents}(id) ON DELETE CASCADE,
+                    content TEXT NOT NULL,
                     embedding VECTOR(1024)
                 )
                 """

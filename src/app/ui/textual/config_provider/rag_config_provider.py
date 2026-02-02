@@ -188,19 +188,17 @@ class RagConfigProvider(ConfigProvider):
         # 2. Update global topic definitions
         topics_cv = rag_cv.childs.get("topics")
         if topics_cv:
-            entries = topics_cv.values.get("entries", [])
+            entries = topics_cv.values.get("entries")
             new_topics: List[Topic] = []
-            for entry in entries:
-                name = str(entry.get("name", "")).strip()
-                path = str(entry.get("path", "")).strip()
-                if name:
-                    new_topics.append(Topic(name=name, path=path))
+            if entries:
+                for entry in entries:
+                    name = str(entry.get("name", "")).strip()
+                    path = str(entry.get("path", "")).strip()
+                    if name:
+                        new_topics.append(Topic(name=name, path=path))
+            else:
+                new_topics = list(self.window.config.topics)
             self.window.config.save_topics(new_topics)
-
-            def _run_ingest(monitor: ProgressMonitor) -> None:
-                RagIngest(self.window.config).ingest(monitor)
-
-            self.window.progress_button.add(_run_ingest)
 
             valid = self.window.config.topic_names()
 
@@ -208,14 +206,36 @@ class RagConfigProvider(ConfigProvider):
             ws = self.window.get_active_workspace()
             ws_cv = topics_cv.childs.get("workspace_topics")
             if ws and ws_cv:
-                ws.topics = ws_cv.values.get("topics", [])
+                ws.topics = self._normalize_topic_names(
+                    ws_cv.values.get("topics", [])
+                )
                 ws.save(valid_topics=valid)
 
             # 4. Update project topics
             prj = self.window.get_active_project()
             prj_cv = topics_cv.childs.get("project_topics")
             if prj and prj_cv:
-                prj.topics = prj_cv.values.get("topics", [])
+                prj.topics = self._normalize_topic_names(
+                    prj_cv.values.get("topics", [])
+                )
                 prj.save(valid_topics=valid)
-        
+
+            def _run_ingest(monitor: ProgressMonitor) -> None:
+                RagIngest(self.window.config).ingest(monitor)
+
+            self.window.progress_button.add(_run_ingest)
+
         self.window.config.save()
+
+    def _normalize_topic_names(self, topics: List[Any]) -> List[str]:
+        names: List[str] = []
+        for topic in topics:
+            if isinstance(topic, dict):
+                name = str(topic.get("name", "")).strip()
+            elif topic.name is not None:
+                name = str(topic.name).strip()
+            else:
+                name = str(topic).strip()
+            if name:
+                names.append(name)
+        return names

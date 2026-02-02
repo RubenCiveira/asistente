@@ -440,5 +440,9 @@ class MainApp(App):
         self.title = f"Asistente  ·  {ws_name} / {prj_name}"
         self.sub_title = ""
 
+    def on_exit(self) -> None:
+        if hasattr(self, "progress_button"):
+            self.progress_button.stop_all()
+
 if __name__ == "__main__":
     MainApp().run()

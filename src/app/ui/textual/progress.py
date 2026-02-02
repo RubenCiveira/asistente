@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from threading import Lock
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -168,7 +168,7 @@ class ProgressDialog(ModalScreen[None]):
             self._unsubscribe = None
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "progress-close" and self._monitor.done:
+        if event.button.id == "progress-close":
             self.dismiss(None)
 
     def _on_monitor_update(self, monitor: UiProgressMonitor) -> None:
@@ -194,7 +194,7 @@ class ProgressDialog(ModalScreen[None]):
         ).update(f"{completed}/{total} ({percent:.1f}%)  Errors: {errors}")
 
         close = self.query_one("#progress-close", Button)
-        close.disabled = not self._monitor.done
+        close.disabled = False
 
 
 class ProgressButton(Button):
@@ -218,14 +218,27 @@ class ProgressButton(Button):
         self.add_class("-flat")
         self._monitors: List[UiProgressMonitor] = []
         self._active: Optional[UiProgressMonitor] = None
+        self._workers: List[Any] = []
 
     def add(self, callback: Callable[[UiProgressMonitor], None]) -> UiProgressMonitor:
         monitor = UiProgressMonitor()
         self._monitors.append(monitor)
         self._set_active(monitor)
         if self.app:
-            self.app.run_worker(lambda: callback(monitor), thread=True)
+            worker = self.app.run_worker(lambda: callback(monitor), thread=True)
+            self._workers.append(worker)
         return monitor
+
+    def stop_all(self) -> None:
+        for worker in list(self._workers):
+            try:
+                worker.cancel()
+            except Exception:
+                pass
+        self._workers.clear()
+
+    def on_unmount(self) -> None:
+        self.stop_all()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if self._active is None:
